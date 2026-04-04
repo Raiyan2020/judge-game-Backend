@@ -27,7 +27,7 @@ return new class extends Migration
             $table->string('fcm_token')->nullable();
             $table->boolean('notified')->default(true);
             $table->date('birthdate')->nullable();
-            $table->string('status')->default(App\Enum\UserStatus::ONLINE->value);
+            $table->string('status')->default(App\Enums\UserStatus::ONLINE->value);
             $table->rememberToken();
             $table->timestamps();
         });

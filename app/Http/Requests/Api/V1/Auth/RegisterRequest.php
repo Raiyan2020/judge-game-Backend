@@ -25,6 +25,7 @@ class RegisterRequest extends FormRequest
             'fcm_token' => 'nullable|string|max:255',
             'gender' => 'nullable|in:male,female',
             'birthdate' => 'nullable|date',
+            'country_id' => 'nullable|exists:countries,id',
         ];
     }
 }

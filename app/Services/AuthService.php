@@ -56,7 +56,8 @@ class AuthService
     {
         $user = $this->repo->checkUser($request);
         if ($user) {
-            $user['token'] = $this->generateToken($user);
+             $this->repo->update($user);
+             $user['token'] = $this->generateToken($user);
             return $user;
         }
 

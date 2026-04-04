@@ -36,8 +36,6 @@ class AuthController extends Controller
 
   }
 
-  
-
   /**
    * @param CheckCodeRequest $request
    * @return \Illuminate\Http\JsonResponse

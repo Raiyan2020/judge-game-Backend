@@ -116,7 +116,8 @@
     "no":"لا",
     "back":"رجوع",
     "delete":"حذف",
-    "The provided credentials are incorrect, please register first.":"بيانات الاعتماد المقدمة غير صحيحة، يرجى التسجيل أولاً."
+    "The provided credentials are incorrect, please register first.":"بيانات الاعتماد المقدمة غير صحيحة، يرجى التسجيل أولاً.",
+    "Message sent successfully":"تم إرسال الرسالة بنجاح"
 
 
  

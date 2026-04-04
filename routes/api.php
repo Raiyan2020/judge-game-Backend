@@ -1,10 +1,12 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\ContactController;
 use App\Http\Controllers\Api\V1\CountryController;
 use App\Http\Controllers\Api\V1\HomeController;
-use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\LastUpdateController;
+use App\Http\Controllers\Api\V1\ProfileController;
+use App\Http\Controllers\Api\V1\SettingController;
 use Illuminate\Support\Facades\Route;
 
 Route::group(['middleware' => 'setLocale'], function () {
@@ -27,5 +29,8 @@ Route::group(['middleware' => 'setLocale'], function () {
     Route::get('home',HomeController::class);
     Route::get('countries',CountryController::class);
     Route::get('last-updates', LastUpdateController::class);
+    Route::post('contact', [ContactController::class, 'store']);
+    Route::get('contact-settings', [SettingController::class, 'contactSettings']);
+
 
 });

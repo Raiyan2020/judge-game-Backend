@@ -25,6 +25,10 @@ class SettingService {
     {
         return $this->repo->getSettingPages();
     }
+    public function getSettingsPages($type)
+    {
+        return $this->repo->getSettingByPage($type);
+    }
     public function getSettingByPage($id)
     {
         return $this->repo->getSettingByPage($id);

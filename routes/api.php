@@ -31,6 +31,9 @@ Route::group(['middleware' => 'setLocale'], function () {
     Route::get('last-updates', LastUpdateController::class);
     Route::post('contact', [ContactController::class, 'store']);
     Route::get('contact-settings', [SettingController::class, 'contactSettings']);
+    Route::get('setting-pages', [SettingController::class, 'getSettingsPages']);
+    Route::get('setting-laws', [SettingController::class, 'getSettingsLaws']);
+
 
 
 });

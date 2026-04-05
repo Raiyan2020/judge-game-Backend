@@ -27,9 +27,9 @@ class SettingRepository extends BaseRepository
     {
         return $this->model->pluck('page')->unique();
     }
-    public function getSettingByPage($id)
+    public function getSettingByPage($type)
     {
-        return $this->model->wherePage($id)->get();
+        return $this->model->whereSlug($type)->get();
     }
     public function getSettingByName($value)
     {

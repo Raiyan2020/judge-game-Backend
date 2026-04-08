@@ -3,6 +3,9 @@
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ContactController;
 use App\Http\Controllers\Api\V1\CountryController;
+use App\Http\Controllers\Api\V1\GroupController;
+use App\Http\Controllers\Api\V1\GroupLawController;
+use App\Http\Controllers\Api\V1\GroupMemberController;
 use App\Http\Controllers\Api\V1\HomeController;
 use App\Http\Controllers\Api\V1\LastUpdateController;
 use App\Http\Controllers\Api\V1\ProfileController;
@@ -24,6 +27,14 @@ Route::group(['middleware' => 'setLocale'], function () {
             Route::post('update-setting', [ProfileController::class, 'updateSetting']);
             Route::post('logout', [AuthController::class, 'logout']);
         });
+
+        Route::apiResource('groups', GroupController::class)->only(['index', 'store']);
+        Route::get('my-groups', [GroupController::class, 'myGroups']);
+        Route::get('groups/{group}/members', [GroupMemberController::class, 'index']);
+        Route::post('groups/{group}/invite', [GroupMemberController::class, 'inviteMember']);
+        Route::post('groups/{group}/members/{user}/accept', [GroupMemberController::class, 'acceptInvitation']);
+        Route::post('groups/{group}/members/{user}/reject', [GroupMemberController::class, 'rejectInvitation']);
+        Route::apiResource('groups/{group}/laws', GroupLawController::class)->parameters(['laws' => 'lawId']);
     });
 
     Route::get('home',HomeController::class);

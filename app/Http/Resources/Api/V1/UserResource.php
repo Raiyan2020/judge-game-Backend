@@ -30,6 +30,7 @@ class UserResource extends JsonResource
             'birthdate' => $this->birthdate,
             'status' => $this->status,
             'status_text' => __($this->status),
+            'member_since' => $this->created_at->locale(app()->getLocale())->translatedFormat('j-F-Y'),
         ];
     }
 }

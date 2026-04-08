@@ -1,0 +1,71 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1;
+
+use App\Http\Controllers\Controller;
+use App\Http\Resources\Api\V1\UserResource;
+use App\Http\Requests\Api\V1\GroupMemberActionRequest;
+use App\Http\Requests\Api\V1\GroupMemberInviteRequest;
+use App\Models\Group;
+use App\Models\User;
+use App\Services\GroupMemberService;
+
+class GroupMemberController extends Controller
+{
+
+   public function __construct(protected GroupMemberService $groupMemberService) {}
+
+   /**
+    * @return \Illuminate\Http\JsonResponse
+    */
+
+   public function index(Group $group)
+   {
+      $grouped = $this->groupMemberService->getGroupMembers($group);
+      return \responder::success([
+         'judge' => UserResource::collection($grouped['judge'] ?? []),
+         'consultant' => UserResource::collection($grouped['consultant'] ?? []),
+         'lawyers' => UserResource::collection($grouped['lawyer'] ?? []),
+         'citizens' => UserResource::collection($grouped['citizen'] ?? []),
+      ]);
+   }
+
+   /**
+    * Invite a member to the group
+    */
+   public function inviteMember(Group $group, GroupMemberInviteRequest $request)
+   {
+      try {
+         $this->groupMemberService->inviteMember($group, $request->validated());
+         return \responder::success(__('User invited successfully'));
+      } catch (\Exception $e) {
+         return \responder::error($e->getMessage());
+      }
+   }
+
+   /**
+    * Accept a pending invitation for the group.
+    */
+   public function acceptInvitation(Group $group)
+   {
+      try {
+         $this->groupMemberService->acceptInvitation($group, auth()->user());
+         return \responder::success(__('Invitation accepted successfully'));
+      } catch (\Exception $e) {
+         return \responder::error($e->getMessage());
+      }
+   }
+
+   /**
+    * Reject a pending invitation and remove the user from the group.
+    */
+   public function rejectInvitation(Group $group)
+   {
+      try {
+         $this->groupMemberService->rejectInvitation($group, auth()->user());
+         return \responder::success(__('Invitation rejected successfully'));
+      } catch (\Exception $e) {
+         return \responder::error($e->getMessage());
+      }
+   }
+}

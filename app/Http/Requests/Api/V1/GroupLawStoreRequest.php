@@ -16,6 +16,7 @@ class GroupLawStoreRequest extends FormRequest
         return [
             'group_id' => 'required|exists:groups,id',
             'description' => 'required|string',
+            'reason' => 'nullable|string',
         ];
     }
 }

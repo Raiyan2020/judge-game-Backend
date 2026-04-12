@@ -4,7 +4,7 @@ namespace App\Http\Requests\Api\V1;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class GroupLawUpdateRequest extends FormRequest
+class GroupLawDestroyRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -14,7 +14,6 @@ class GroupLawUpdateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'description' => 'required|string',
             'reason' => 'required|string',
         ];
     }

@@ -9,7 +9,7 @@ class GroupLaw extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['group_id', 'description', 'modification_reason'];
+    protected $fillable = ['group_id', 'description', 'reason'];
 
     public function group()
     {

@@ -5,9 +5,11 @@ use App\Http\Controllers\Api\V1\ContactController;
 use App\Http\Controllers\Api\V1\CountryController;
 use App\Http\Controllers\Api\V1\GroupController;
 use App\Http\Controllers\Api\V1\GroupLawController;
+use App\Http\Controllers\Api\V1\GroupLawRequestController;
 use App\Http\Controllers\Api\V1\GroupMemberController;
 use App\Http\Controllers\Api\V1\HomeController;
 use App\Http\Controllers\Api\V1\LastUpdateController;
+use App\Http\Controllers\Api\V1\MessageController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\SettingController;
 use Illuminate\Support\Facades\Route;
@@ -34,8 +36,10 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::post('groups/{group}/invite', [GroupMemberController::class, 'inviteMember']);
         Route::post('groups/{group}/members/{user}/accept', [GroupMemberController::class, 'acceptInvitation']);
         Route::post('groups/{group}/members/{user}/reject', [GroupMemberController::class, 'rejectInvitation']);
-        Route::apiResource('groups/{group}/laws', GroupLawController::class)->parameters(['laws' => 'lawId']);
-    });
+        Route::apiResource('group-laws', GroupLawController::class)->only(['index', 'store', 'update', 'destroy']);
+        Route::get('groups/{group}/messages', [MessageController::class, 'index']);
+        Route::post('groups/{group}/messages', [MessageController::class, 'store']);
+         });
 
     Route::get('home',HomeController::class);
     Route::get('countries',CountryController::class);

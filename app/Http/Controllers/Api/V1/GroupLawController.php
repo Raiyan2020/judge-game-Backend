@@ -16,9 +16,9 @@ class GroupLawController extends Controller
 {
     public function __construct(protected GroupLawService $groupLawService) {}
 
-    public function index(Group $group)
+    public function index($groupId)
     {
-        $laws = $this->groupLawService->index($group);
+        $laws = $this->groupLawService->index($groupId);
         return \responder::success(GroupLawResource::collection($laws));
     }
 

@@ -36,7 +36,8 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::post('groups/{group}/invite', [GroupMemberController::class, 'inviteMember']);
         Route::post('groups/{group}/members/{user}/accept', [GroupMemberController::class, 'acceptInvitation']);
         Route::post('groups/{group}/members/{user}/reject', [GroupMemberController::class, 'rejectInvitation']);
-        Route::apiResource('group-laws', GroupLawController::class)->only(['index', 'store', 'update', 'destroy']);
+        Route::apiResource('group-laws', GroupLawController::class)->only([ 'store', 'update', 'destroy']);
+        Route::get('group-laws/{group}', [GroupLawController::class, 'index']);
         Route::get('groups/{group}/messages', [MessageController::class, 'index']);
         Route::post('groups/{group}/messages', [MessageController::class, 'store']);
          });

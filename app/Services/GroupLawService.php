@@ -13,9 +13,9 @@ class GroupLawService
     {
     }
 
-    public function index(Group $group)
+    public function index($groupId)
     {
-        return $this->repo->getByGroup($group->id);
+        return $this->repo->getByGroup($groupId);
     }
 
     public function store(array $data)

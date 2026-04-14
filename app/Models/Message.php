@@ -5,13 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['group_id', 'user_id', 'message', 'type', 'file'])]
+#[Fillable(['chat_id', 'user_id', 'message', 'type', 'attachment'])]
 class Message extends Model
 {
   #relations
-    public function group()
+    public function chat()
     {
-        return $this->belongsTo(Group::class);
+        return $this->belongsTo(Chat::class);
     }
 
     public function user()
@@ -20,7 +20,7 @@ class Message extends Model
     }
 
    # Accessors & Mutators
-     public function getFileAttribute($value)
+     public function getAttachmentAttribute($value)
     {
         if ($value)
             return getimg($value);
@@ -30,12 +30,12 @@ class Message extends Model
     }
 
 
-    public function setFileAttribute($value)
+    public function setAttachmentAttribute($value)
     {
         if (is_file($value))
-            $this->attributes['file'] = uploader($value);
+            $this->attributes['attachment'] = uploader($value);
         else
-            $this->attributes['file'] = $value;
+            $this->attributes['attachment'] = $value;
 
     }
 }

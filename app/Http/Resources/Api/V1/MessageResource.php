@@ -11,7 +11,8 @@ class MessageResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'group_id' => $this->group_id,
+            'group_id' => $this->relationLoaded('chat') ? $this->chat?->group_id : null,
+            'chat_id' => $this->chat_id,
             'user_id' => $this->user_id,
             'user' => $this->relationLoaded('user') ? [
                 'id' => $this->user->id,
@@ -21,7 +22,7 @@ class MessageResource extends JsonResource
          //   'receiver' => $this->receiver ? new UserResource($this->whenLoaded('receiver')) : null,
             'message' => $this->message,
             'type' => $this->type,
-            'file' => $this->file,
+            'attachment' => $this->attachment,
             'created_at' => $this->created_at?->format('H:i a'),
         ];
     }

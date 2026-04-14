@@ -24,6 +24,8 @@ class GroupRepository extends BaseRepository
     {
         $group = $this->model->create($data);
         $group->users()->attach($judgeId, ['role' => \App\Enums\GroupRole::JUDGE->value , 'status' => 'accepted', 'title' => \App\Enums\GroupRole::JUDGE->value ]);
+        $chat = $group->chat()->create(['type' => 'group']);
+         $chat->users()->attach($judgeId);
         return $group->load('users');
     }
 
@@ -50,6 +52,7 @@ class GroupRepository extends BaseRepository
     public function updateGroupMemberStatus($group, $user, string $status)
     {
         $group->users()->updateExistingPivot($user->id, ['status' => $status]);
+        
     }
 
     public function removeGroupMember($group, $user)

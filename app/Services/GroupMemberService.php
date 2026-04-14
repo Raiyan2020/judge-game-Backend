@@ -67,6 +67,7 @@ class GroupMemberService
        }
 
        $this->repo->updateGroupMemberStatus($group, $user, 'accepted');
+       $group->chat?->users()->attach($user->id);
 
        return $user;
    }

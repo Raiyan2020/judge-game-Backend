@@ -14,10 +14,11 @@ class MessageStoreRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'group_id' => 'nullable|exists:groups,id',
+            'receiver_id' => 'requiredIf:group_id,null|exists:users,id',
+            'group_id' => 'requiredIf:receiver_id,null|exists:groups,id',
             'message' => 'nullable|string',
             'type' => 'nullable|string|in:text,voice,image,file',
-            'file' => 'nullable', 
+            'attachment' => 'nullable', 
         ];
     }
 }

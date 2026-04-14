@@ -13,18 +13,18 @@ class MessageController extends Controller
 {
     public function __construct(protected MessageService $messageService) {}
 
-    public function index(Group $group, Request $request)
+    public function getGroupMessages(Group $group)
     {
-        $messages = $this->messageService->index($group, $request->type);
+        $messages = $this->messageService->index($group, 'group');
         return \responder::success(MessageResource::collection($messages));
     }
 
   
 
-    public function store(Group $group, MessageStoreRequest $request)
+    public function store(MessageStoreRequest $request)
     {
-        $message = $this->messageService->store($group, $request->validated());
-        return \responder::success(new MessageResource($message->load('user')));
+        $message = $this->messageService->sendMessage($request->validated());
+        return \responder::success(new MessageResource($message->load('user','chat')));
     }
 
 }

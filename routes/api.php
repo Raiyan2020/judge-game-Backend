@@ -34,12 +34,12 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::get('my-groups', [GroupController::class, 'myGroups']);
         Route::get('groups/{group}/members', [GroupMemberController::class, 'index']);
         Route::post('groups/{group}/invite', [GroupMemberController::class, 'inviteMember']);
-        Route::post('groups/{group}/members/{user}/accept', [GroupMemberController::class, 'acceptInvitation']);
-        Route::post('groups/{group}/members/{user}/reject', [GroupMemberController::class, 'rejectInvitation']);
+        Route::post('groups/{group}/accept', [GroupMemberController::class, 'acceptInvitation']);
+        Route::post('groups/{group}/reject', [GroupMemberController::class, 'rejectInvitation']);
         Route::apiResource('group-laws', GroupLawController::class)->only([ 'store', 'update', 'destroy']);
         Route::get('group-laws/{group}', [GroupLawController::class, 'index']);
-        Route::get('groups/{group}/messages', [MessageController::class, 'index']);
-        Route::post('groups/{group}/messages', [MessageController::class, 'store']);
+        Route::get('groups/{group}/messages', [MessageController::class, 'getGroupMessages']);
+        Route::post('messages', [MessageController::class, 'store']);
          });
 
     Route::get('home',HomeController::class);

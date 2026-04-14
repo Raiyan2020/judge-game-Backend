@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Chat;
 use App\Models\Group;
 use App\Models\User;
 use Illuminate\Database\Migrations\Migration;
@@ -15,11 +16,11 @@ return new class extends Migration
     {
         Schema::create('messages', function (Blueprint $table) {
             $table->id();
-            $table->foreignIdFor(Group::class)->constrained()->cascadeOnDelete();
             $table->foreignIdFor(User::class)->constrained()->cascadeOnDelete();
+            $table->foreignIdFor(Chat::class)->constrained()->cascadeOnDelete();
             $table->text('message')->nullable();
             $table->string('type')->default('text'); 
-            $table->string('file')->nullable();
+            $table->string('attachment')->nullable();
             $table->timestamps();
         });
     }

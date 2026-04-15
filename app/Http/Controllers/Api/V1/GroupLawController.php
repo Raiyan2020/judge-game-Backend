@@ -7,9 +7,7 @@ use App\Http\Requests\Api\V1\GroupLawDestroyRequest;
 use App\Http\Requests\Api\V1\GroupLawStoreRequest;
 use App\Http\Requests\Api\V1\GroupLawUpdateRequest;
 use App\Http\Resources\Api\V1\GroupLawResource;
-use App\Models\Group;
 use App\Models\GroupLaw;
-use App\Models\GroupLawRequest;
 use App\Services\GroupLawService;
 
 class GroupLawController extends Controller
@@ -25,33 +23,21 @@ class GroupLawController extends Controller
     public function store(GroupLawStoreRequest $request)
     {
         $result = $this->groupLawService->store($request->validated());
-
-        if ($result instanceof GroupLawRequest) {
-            return \responder::success(__('Law creation request submitted and pending approval'));
-        }
-
-        return \responder::success(new GroupLawResource($result));
+        $isCreator = $this->groupLawService->isGroupOwner($request->validated()['group_id']);
+        return \responder::success($isCreator ? __('Law created successfully') : __('request submitted and pending approval'));
     }
 
     public function update(GroupLaw $groupLaw, GroupLawUpdateRequest $request)
     {
         $result = $this->groupLawService->update($groupLaw, $request->validated());
-
-        if ($result instanceof GroupLawRequest) {
-            return \responder::success(__('Law update request submitted and pending approval'));
-        }
-
-        return \responder::success(new GroupLawResource($result));
+        $isCreator = $this->groupLawService->isGroupOwner($groupLaw->group_id);
+        return \responder::success($isCreator ? __('Law updated successfully') : __('request submitted and pending approval'));
     }
 
     public function destroy(GroupLawDestroyRequest $request, GroupLaw $groupLaw)
     {
         $result = $this->groupLawService->destroy($groupLaw, $request->validated());
-
-        if ($result instanceof GroupLawRequest) {
-            return \responder::success(__('Law deletion request submitted and pending approval'));
-        }
-
-        return \responder::success(__('Law deleted successfully'));
+        $isCreator = $this->groupLawService->isGroupOwner($groupLaw->group_id);
+        return \responder::success($isCreator ? __('Law deleted successfully') : __('request submitted and pending approval'));
     }
 }

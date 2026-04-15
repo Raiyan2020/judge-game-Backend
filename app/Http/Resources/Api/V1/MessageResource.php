@@ -23,6 +23,7 @@ class MessageResource extends JsonResource
             'message' => $this->message,
             'type' => $this->type,
             'attachment' => $this->attachment,
+            'poll' => $this->relationLoaded('poll') ? new ChatPollResource($this->poll) : null,
             'created_at' => $this->created_at?->format('H:i a'),
         ];
     }

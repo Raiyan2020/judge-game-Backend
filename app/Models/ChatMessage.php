@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
 #[Fillable(['chat_id', 'user_id', 'message', 'type', 'attachment'])]
-class Message extends Model
+class ChatMessage extends Model
 {
   #relations
     public function chat()
@@ -17,6 +17,11 @@ class Message extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function poll()
+    {
+        return $this->hasOne(ChatPoll::class);
     }
 
    # Accessors & Mutators

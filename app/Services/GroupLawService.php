@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\ChatPollType;
 use App\Models\Group;
 use App\Models\GroupLawRequest;
 use App\Repositories\GroupLawRepository;
@@ -9,9 +10,7 @@ use Illuminate\Validation\ValidationException;
 
 class GroupLawService
 {
-    public function __construct(protected GroupLawRepository $repo)
-    {
-    }
+    public function __construct(protected GroupLawRepository $repo, protected MessageService $messageService) {}
 
     public function index($groupId)
     {
@@ -30,14 +29,7 @@ class GroupLawService
             ]);
         }
 
-        return GroupLawRequest::create([
-            'group_id' => $data['group_id'],
-            'user_id' => auth('sanctum')->id(),
-            'action' => 'create',
-            'description' => $data['description'],
-            'reason' => $data['reason']
-           
-        ]);
+        return $this->createPoll($data, ChatPollType::CREATE_LAW->value);
     }
 
     public function update($groupLaw, array $data)
@@ -51,15 +43,7 @@ class GroupLawService
             ]);
         }
 
-        return GroupLawRequest::create([
-            'group_id' => $groupLaw->group_id,
-            'group_law_id' => $groupLaw->id,
-            'user_id' => auth('sanctum')->id(),
-            'action' => 'update',
-            'description' => $data['description'],
-            'reason' => $data['reason']
-           
-        ]);
+        return $this->createPoll(array_merge($data, ['group_law_id' => $groupLaw->id , 'group_id' => $groupLaw->group_id]), ChatPollType::UPDATE_LAW->value);
     }
 
     public function destroy($groupLaw, array $data = [])
@@ -70,14 +54,13 @@ class GroupLawService
             return $this->repo->delete($groupLaw);
         }
 
-        return GroupLawRequest::create([
-            'group_id' => $groupLaw->group_id,
-            'group_law_id' => $groupLaw->id,
-            'user_id' => auth('sanctum')->id(),
-            'action' => 'delete',
-            'reason' => $data['reason'] ,
-           
-        ]);
+        return $this->createPoll(array_merge($data, ['group_law_id' => $groupLaw->id , 'group_id' => $groupLaw->group_id]), ChatPollType::DELETE_LAW->value);
+    }
+
+    protected function createPoll(array $data, string $type)
+    {
+
+        $this->messageService->createPoll($data, $type);
     }
 
     protected function checkMembership($groupId)
@@ -99,7 +82,7 @@ class GroupLawService
         }
     }
 
-    protected function isGroupOwner($groupId)
+    public function isGroupOwner($groupId)
     {
         $group = Group::findOrFail($groupId);
         return auth('sanctum')->id() === $group->user_id;

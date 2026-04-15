@@ -128,5 +128,9 @@
     "Failed to accept invitation.":"فشل في قبول الدعوة.",
     "Invitation rejected successfully":"تم رفض الدعوة بنجاح",
     "Failed to reject invitation.":"فشل في رفض الدعوة.",
-    "Law deleted successfully":"تم حذف القانون بنجاح"
+    "Law deleted successfully":"تم حذف القانون بنجاح",
+    "Law created successfully":"تم إنشاء القانون بنجاح",
+    "request submitted and pending now":"تم تقديم طلبك وهو قيد الانتظار ",
+    "Law updated successfully":"تم تحديث القانون بنجاح",
+    "Law delete successfully":"تم حذف القانون بنجاح"
 }

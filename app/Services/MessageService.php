@@ -4,8 +4,9 @@ namespace App\Services;
 
 use App\Events\MessageSent;
 use App\Models\Chat;
+use App\Models\ChatMessage;
+use App\Models\ChatPoll;
 use App\Models\Group;
-use App\Models\Message;
 use Illuminate\Validation\ValidationException;
 
 class MessageService
@@ -16,7 +17,7 @@ class MessageService
 
         $userId = auth('sanctum')->id();
 
-        $query = Message::query()->with('user','chat');
+        $query = ChatMessage::query()->with('user', 'chat','poll.options');
 
         if ($type === 'group') {
             $query->whereHas('chat', function ($q) use ($group) {
@@ -40,7 +41,7 @@ class MessageService
         return $query->latest()->get();
     }
 
-   
+
 
     protected function checkMembership(Group $group)
     {
@@ -63,7 +64,6 @@ class MessageService
     public function getGroupChat(Group $group)
     {
         return Chat::where('group_id', $group->id)->first();
-        
     }
 
     public function getOrCreatePrivateChat(int $userId): Chat
@@ -102,12 +102,11 @@ class MessageService
             $group = Group::find($data['group_id']);
             $chat = $this->getGroupChat($group);
             $this->checkMembership($group);
-
         } else {
             $chat = $this->getOrCreatePrivateChat($data['receiver_id']);
         }
 
-        $message = Message::create([
+        $message = ChatMessage::create([
             'user_id' => $userId,
             'chat_id' => $chat->id,
             'message' => $data['message'] ?? null,
@@ -115,9 +114,57 @@ class MessageService
             'attachment' => $data['attachment'] ?? null,
         ]);
 
-           broadcast(new MessageSent($message))->toOthers();
+        broadcast(new MessageSent($message))->toOthers();
 
-           return $message;
+        return $message;
+    }
 
+    public function createPoll($data, $type)
+    {
+        $chat = $this->getChatByGroupId($data['group_id']);
+
+        $message = $this->createPollMessage($chat->id);
+
+        $poll = $this->createPollRecord($message->id, $data, $type);
+
+        $this->createPollOptions($poll);
+
+        return $poll;
+    }
+
+    protected function getChatByGroupId($groupId)
+    {
+        return Chat::where('group_id', $groupId)->firstOrFail();
+    }
+
+    protected function createPollMessage($chatId)
+    {
+        return ChatMessage::create([
+            'user_id' => auth('sanctum')->id(),
+            'chat_id' => $chatId,
+            'type' => 'poll',
+        ]);
+    }
+
+    protected function createPollRecord($messageId, $data, $type)
+    {
+        return ChatPoll::create([
+            'chat_message_id' => $messageId,
+            'user_id' => auth('sanctum')->id(),
+            'type' => $type,
+            'group_law_id' => $data['group_law_id'] ?? null,
+            'data' => [
+                'description' => $data['description'] ?? null,
+                'reason' => $data['reason'] ?? null,
+            ],
+            'expires_at' => now()->addHours(24),
+        ]);
+    }
+    protected function createPollOptions($poll)
+    {
+        return $poll->options()->createMany([
+            ['option' => 'yes'],
+            ['option' => 'no'],
+        ]);
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AdsController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ContactController;
 use App\Http\Controllers\Api\V1\CountryController;
@@ -40,6 +41,7 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::get('group-laws/{group}', [GroupLawController::class, 'index']);
         Route::get('groups/{group}/messages', [MessageController::class, 'getGroupMessages']);
         Route::post('messages', [MessageController::class, 'store']);
+        Route::post('ads', [AdsController::class, 'store']);
          });
 
     Route::get('home',HomeController::class);

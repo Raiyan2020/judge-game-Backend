@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\ChatPollType;
 use App\Events\MessageSent;
 use App\Models\Chat;
 use App\Models\ChatMessage;
@@ -17,7 +18,7 @@ class MessageService
 
         $userId = auth('sanctum')->id();
 
-        $query = ChatMessage::query()->with('user', 'chat','poll.options');
+        $query = ChatMessage::query()->with('user', 'chat', 'poll.options');
 
         if ($type === 'group') {
             $query->whereHas('chat', function ($q) use ($group) {
@@ -85,7 +86,6 @@ class MessageService
             return $chat;
         }
 
-        // create new chat
         $chat = Chat::create([
             'type' => 'private',
         ]);
@@ -117,6 +117,19 @@ class MessageService
         broadcast(new MessageSent($message))->toOthers();
 
         return $message;
+    }
+
+    public function CreateAdsPoll(array $data)
+    {
+        $chat = $this->getChatByGroupId($data['group_id']);
+
+        $message = $this->createPollMessage($chat->id);
+
+        $poll = $this->createPollRecord($message->id, $data, ChatPollType::ADS->value);
+
+        $this->createPollOptions($poll, $data['options'] ?? null);
+
+        return $poll;
     }
 
     public function createPoll($data, $type)
@@ -160,11 +173,19 @@ class MessageService
             'expires_at' => now()->addHours(24),
         ]);
     }
-    protected function createPollOptions($poll)
+    protected function createPollOptions($poll, $options = null)
     {
-        return $poll->options()->createMany([
-            ['option' => 'yes'],
-            ['option' => 'no'],
-        ]);
+        if ($options) {
+            $options = collect($options)->map(function ($option) {
+                return ['option' => $option];
+            })->toArray();
+        } else {
+            $options = [
+                ['option' => 'yes'],
+                ['option' => 'no'],
+            ];
+        }
+
+        return $poll->options()->createMany($options);
     }
 }

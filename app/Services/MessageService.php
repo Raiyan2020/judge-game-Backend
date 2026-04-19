@@ -12,13 +12,21 @@ use Illuminate\Validation\ValidationException;
 
 class MessageService
 {
-    public function index(Group $group, $type = 'group')
+    public function index($type = 'group', $group = null)
     {
-        $this->checkMembership($group);
+        if ($type === 'group' && $group) {
+            $this->checkMembership($group);
+        }
 
         $userId = auth('sanctum')->id();
 
-        $query = ChatMessage::query()->with('user', 'chat', 'poll.options');
+        $query = ChatMessage::query()->with([
+            'user',
+            'chat',
+            'poll.options' => function ($q) {
+                $q->withCount('votes');
+            }
+        ]);
 
         if ($type === 'group') {
             $query->whereHas('chat', function ($q) use ($group) {
@@ -40,6 +48,34 @@ class MessageService
         }
 
         return $query->latest()->get();
+    }
+
+    public function getChatMessages(array $filters = [])
+    {
+        $authId = auth('sanctum')->id();
+        return Chat::query()
+            ->whereHas('users', function ($q) use ($authId) {
+                $q->where('user_id', $authId);
+            })
+
+            ->when(!empty($filters['name']), function ($q) use ($filters, $authId) {
+                $q->whereHas('users', function ($q2) use ($filters, $authId) {
+                    $q2->where('users.id', '!=', $authId)
+                        ->where('name', 'like', '%' . $filters['name'] . '%');
+                });
+            })
+            ->with([
+                'lastMessage.user',
+                'otherUser' => fn($q) => $q->where('users.id', '!=', $authId)
+            ])
+            // ->withCount([
+            //     'messages as unread_count' => function ($q) use ($authId) {
+            //         $q->whereNull('read_at')
+            //             ->where('user_id', '!=', $authId);
+            //     }
+            // ])
+            ->latest()
+            ->get();
     }
 
 
@@ -187,5 +223,26 @@ class MessageService
         }
 
         return $poll->options()->createMany($options);
+    }
+
+    public function votePoll($messageId, $optionId)
+    {
+        $poll = ChatPoll::where('chat_message_id', $messageId)->firstOrFail();
+
+        if ($poll->is_closed) {
+            throw ValidationException::withMessages(['This poll is closed']);
+        }
+
+        $option = $poll->options()->where('id', $optionId)->firstOrFail();
+
+        $existingVote = $option->votes()->where('user_id', auth('sanctum')->id())->first();
+
+        if ($existingVote) {
+            throw ValidationException::withMessages(['You have already voted in this poll']);
+        }
+
+        return $option->votes()->create([
+            'user_id' => auth('sanctum')->id(),
+        ]);
     }
 }

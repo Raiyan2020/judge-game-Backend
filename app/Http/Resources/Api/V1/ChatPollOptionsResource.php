@@ -12,7 +12,7 @@ class ChatPollOptionsResource extends JsonResource
         return [
             'id' => $this->id,
             'option' => $this->option,
-            'votes_count' => 0,
+            'votes_count' =>  $this->votes_count ,
         ];
     }
 }

@@ -16,11 +16,24 @@ class Chat extends Model
 
     public function users()
     {
-        return $this->belongsToMany(User::class)->withTimestamps()->withPivot('read_at');
+        return $this->belongsToMany(User::class)->withTimestamps();
     }
 
     public function messages()
     {
         return $this->hasMany(ChatMessage::class);
+    }
+
+    public function lastMessage()
+    {
+        return $this->hasOne(ChatMessage::class)->latestOfMany();
+    }
+
+    public function otherUser()
+    {
+        $authId = auth('sanctum')->id();
+        return $this->belongsToMany(User::class, 'chat_user')
+            ->where('users.id', '!=', $authId)
+            ->select('users.id', 'name', 'status', 'image');
     }
 }

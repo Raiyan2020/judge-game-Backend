@@ -40,7 +40,10 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::apiResource('group-laws', GroupLawController::class)->only([ 'store', 'update', 'destroy']);
         Route::get('group-laws/{group}', [GroupLawController::class, 'index']);
         Route::get('groups/{group}/messages', [MessageController::class, 'getGroupMessages']);
+        Route::get('private-messages', [MessageController::class, 'getPrivateMessages']);
         Route::post('messages', [MessageController::class, 'store']);
+        Route::get('chats', [MessageController::class, 'getChats']);
+        Route::post('messages/{messageId}/vote', [MessageController::class, 'votePoll']);
         Route::post('ads', [AdsController::class, 'store']);
          });
 

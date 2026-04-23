@@ -16,6 +16,7 @@ return new class extends Migration
             $table->id();
             $table->foreignIdFor(LegalCase::class)->constrained()->onDelete('cascade');
             $table->text('opinion');
+            $table->string('role')->nullable();
             $table->text('closing_statements')->nullable();
             $table->boolean('is_final')->default(false);
             $table->timestamps();

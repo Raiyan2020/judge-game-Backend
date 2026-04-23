@@ -19,7 +19,6 @@ return new class extends Migration
             $table->id();
             $table->string('title');
             $table->foreignIdFor(Group::class)->constrained()->onDelete('cascade');
-            $table->foreignIdFor(GroupLaw::class)->constrained()->onDelete('cascade');
             $table->foreignIdFor(User::class)->constrained()->onDelete('cascade');
             $table->text('description')->nullable();
             $table->string('status')->default(LegalCaseStatus::NEW->value);

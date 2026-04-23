@@ -47,6 +47,7 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::post('messages/{messageId}/vote', [MessageController::class, 'votePoll']);
         Route::post('ads', [AdsController::class, 'store']);
         Route::post('legal-cases', [LegalCaseController::class, 'store']);
+        Route::get('legal-cases/{legalCase}', [LegalCaseController::class, 'show']);
          });
 
     Route::get('home',HomeController::class);

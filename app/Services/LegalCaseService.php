@@ -2,8 +2,11 @@
 
 namespace App\Services;
 
+use App\Enums\CaseRole;
+use App\Models\LegalCaseParty;
 use App\Repositories\LegalCaseRepository;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class LegalCaseService
 {
@@ -15,12 +18,18 @@ class LegalCaseService
     {
         try {
             DB::beginTransaction();
+            $userId = auth()->id();
             $participants = $request['participants'];
-            $request['user_id'] = auth()->id();
+            $request['user_id'] = $userId;
             $legalCase = $this->repo->create($request);
             $attachments = $this->collectAttachments($request);
             $this->uploadAttachments($legalCase, $attachments);
+            $participants[] = [
+                'user_id' => $userId,
+                'role' => 'plaintiff',
+            ];
             $legalCase->participants()->createMany($participants);
+            $legalCase->groupLaws()->attach($request['group_law_ids']);
             DB::commit();
 
             return $legalCase;
@@ -62,5 +71,25 @@ class LegalCaseService
     public function activation($model)
     {
         return $this->repo->activation($model);
+    }
+
+    public function assignDefendantLawyer($request)
+    {
+        $case = $this->repo->find($request['legal_case_id']);
+
+        $existingLawyer = $case->participants()
+            ->where('role', CaseRole::DEFENDANT_LAWYER->value)
+            ->exists();
+
+        if ($existingLawyer) {
+            throw ValidationException::withMessages([__('A defendant lawyer is already assigned to this case')]);
+        }
+
+        $case->participants()->create([
+            'user_id' => $request['lawyer_id'],
+            'role' => CaseRole::DEFENDANT_LAWYER->value,
+        ]);
+
+        return $case;
     }
 }

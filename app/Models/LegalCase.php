@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\CaseRole;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\MediaLibrary\HasMedia;
@@ -34,16 +35,35 @@ class LegalCase extends Model implements HasMedia
 
     public function plaintiff()
     {
-        return $this->hasOne(LegalCaseParty::class)->where('role', 'plaintiff');
+        return $this->hasOne(LegalCaseParty::class)->where('role', CaseRole::PLAINTIFF->value);
     }
 
     public function defendant()
     {
-        return $this->hasOne(LegalCaseParty::class)->where('role', 'defendant');
+        return $this->hasOne(LegalCaseParty::class)->where('role', CaseRole::DEFENDANT->value);
+    }
+
+    public function plaintiffLawyer()
+    {
+        return $this->hasOne(LegalCaseParty::class)->where('role', CaseRole::PLAINTIFF_LAWYER->value);
+    }
+    public function defendantLawyer()
+    {
+        return $this->hasOne(LegalCaseParty::class)->where('role', CaseRole::DEFENDANT_LAWYER->value);
+    }
+
+    public function judge()
+    {
+        return $this->hasOne(LegalCaseParty::class)->where('role', CaseRole::JUDGE->value);
     }
 
     public function witnesses()
     {
-        return $this->hasMany(LegalCaseParty::class)->where('role', 'witness');
+        return $this->hasMany(LegalCaseParty::class)->where('role', CaseRole::WITNESS->value);
+    }
+
+    public function news()
+    {
+        return $this->hasMany(LegalCaseNews::class);
     }
 }

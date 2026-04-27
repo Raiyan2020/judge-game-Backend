@@ -50,16 +50,13 @@ class LegalCaseResource extends JsonResource
 
             'laws' => $this->relationLoaded('groupLaws') ? GroupLawResource::collection($this->groupLaws) : [], 
             
-
-            'laws' => $this->relationLoaded('groupLaws') ? GroupLawResource::collection($this->groupLaws) : [],
-
             'opinions' => $this->relationLoaded('opinions') ? LegalCaseOpinionResource::collection($this->opinions) : [],
 
             'images' =>  $this->relationLoaded('media') ? MediaResource::collection($this->getMedia('images')) :[],
             'videos' =>  $this->relationLoaded('media') ? MediaResource::collection($this->getMedia('videos')) :[],
             'audios' =>  $this->relationLoaded('media') ? MediaResource::collection($this->getMedia('audios')) :[],
 
-            'created_at' => $this->created_at,
+            'created_at' => $this->created_at->format('d/m/Y'),
         ];
     }
 }

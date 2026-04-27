@@ -133,5 +133,8 @@
     "request submitted and pending now":"تم تقديم طلبك وهو قيد الانتظار ",
     "Law updated successfully":"تم تحديث القانون بنجاح",
     "Law delete successfully":"تم حذف القانون بنجاح",
-    "Ad created successfully":"تم إنشاء الإعلان بنجاح"
+    "Ad created successfully":"تم إنشاء الإعلان بنجاح",
+    "against":"ضد",
+    "for":"لصالح",
+    "case":"القضية"
 }

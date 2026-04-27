@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Enums\CaseRole;
-use App\Models\LegalCaseParty;
+use App\Enums\GroupRole;
+use App\Models\User;
+use App\Repositories\GroupRepository;
 use App\Repositories\LegalCaseRepository;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -12,7 +14,7 @@ class LegalCaseService
 {
 
 
-    public function __construct(protected LegalCaseRepository $repo) {}
+    public function __construct(protected LegalCaseRepository $repo, protected GroupRepository $groupRepo) {}
 
     public function create($request)
     {
@@ -21,6 +23,11 @@ class LegalCaseService
             $userId = auth()->id();
             $participants = $request['participants'];
             $request['user_id'] = $userId;
+            $group = $this->groupRepo->find($request['group_id']);
+            if (!$group) {
+                throw ValidationException::withMessages([__('Group not found')]);
+            }
+            $this->validateUserCanCreateCase($group);
             $legalCase = $this->repo->create($request);
             $attachments = $this->collectAttachments($request);
             $this->uploadAttachments($legalCase, $attachments);
@@ -28,16 +35,82 @@ class LegalCaseService
                 'user_id' => $userId,
                 'role' => 'plaintiff',
             ];
+         
             $legalCase->participants()->createMany($participants);
             $legalCase->groupLaws()->attach($request['group_law_ids']);
+            $this->createCaseNews($legalCase, $userId, $participants);
+
+
             DB::commit();
 
             return $legalCase;
         } catch (\Exception $e) {
             DB::rollBack();
-            throw new \Exception(__('Failed to create legal case. Please try again later.'));
+            
+
+           throw new \Exception(__('Failed to create legal case. Please try again later.'));
         }
     }
+
+    private function createCaseNews($legalCase, $userId, $participants)
+    {
+        $defendant = null;
+        foreach ($participants as $participant) {
+            if ($participant['role'] == 'defendant') {
+                $defendant = $participant['user_id'];
+                break;
+            }
+        }
+        if ($defendant) {
+            $this->repo->createCaseNews($legalCase, 'case_created', [
+                'ar' => 'تم إنشاء القضية',
+                'en' => 'Legal case created',
+            ], $userId, $defendant);
+        }
+    }
+
+    private function validateUserCanCreateCase($group): void
+    {
+        $userId = auth()->id();
+
+        $membersQuery = $group->users();
+
+        $isMember = (clone $membersQuery)
+            ->where('user_id', $userId)
+            ->exists();
+
+        if (!$isMember) {
+            throw ValidationException::withMessages([
+                __('You must be a member of the group to create a legal case')
+            ]);
+        }
+
+        $isJudge = (clone $membersQuery)
+            ->where('user_id', $userId)
+            ->wherePivot('role', GroupRole::JUDGE->value)
+            ->exists();
+
+        if ($isJudge) {
+            throw ValidationException::withMessages([
+                __('Group judge cannot create legal cases')
+            ]);
+        }
+
+        $lawyersCount = (clone $membersQuery)
+            ->wherePivot('role', GroupRole::LAWYER->value)
+            ->count();
+
+        $citizensCount = (clone $membersQuery)
+            ->wherePivot('role', GroupRole::CITIZEN->value)
+            ->count();
+
+        if ($lawyersCount < 2 && $citizensCount < 2) {
+            throw ValidationException::withMessages([
+                __('At least 2 lawyers or 2 citizens are required in the group to create a legal case')
+            ]);
+        }
+    }
+
     private function collectAttachments($request)
     {
         return [

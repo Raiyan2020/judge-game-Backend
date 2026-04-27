@@ -14,5 +14,17 @@ class LegalCaseRepository extends BaseRepository
     {
         parent::__construct($model);
     }
+
+    public function createCaseNews($legalCase, $type, $content, $actorId , $subjectId )
+    {
+         $news = $legalCase->news()->create([
+            'type' => $type,
+            'content' => $content,
+            'actor_id' => $actorId,
+            'group_id' => $legalCase->group_id,
+            'subject_id' => $subjectId,
+        ]);
+        return $news;
+    }
   
 }

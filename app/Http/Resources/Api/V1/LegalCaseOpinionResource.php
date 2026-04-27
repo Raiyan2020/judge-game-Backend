@@ -14,13 +14,11 @@ class LegalCaseOpinionResource extends JsonResource
             'user_id' => $this->user_id,
             'role' => $this->role,
             'opinion' => $this->opinion,
-            'closing_statements' => $this->closing_statements,
+            'final_requests' => $this->final_requests,
             'is_final' => (bool) $this->is_final,
-            'created_at' => $this->created_at,
             'images' =>  $this->relationLoaded('media') ? MediaResource::collection($this->getMedia('images')) :[],
             'videos' =>  $this->relationLoaded('media') ? MediaResource::collection($this->getMedia('videos')) :[],
             'audios' =>  $this->relationLoaded('media') ? MediaResource::collection($this->getMedia('audios')) :[],
-
             'user' => [
                 'id' => $this->user?->id,
                 'name' => $this->user?->name,

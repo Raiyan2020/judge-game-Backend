@@ -11,6 +11,8 @@ use App\Http\Controllers\Api\V1\GroupMemberController;
 use App\Http\Controllers\Api\V1\HomeController;
 use App\Http\Controllers\Api\V1\LastUpdateController;
 use App\Http\Controllers\Api\V1\LegalCaseController;
+use App\Http\Controllers\Api\V1\LegalCaseNewsController;
+use App\Http\Controllers\Api\V1\LegalCaseOpinionController;
 use App\Http\Controllers\Api\V1\MessageController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\SettingController;
@@ -48,7 +50,10 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::post('ads', [AdsController::class, 'store']);
         Route::post('legal-cases', [LegalCaseController::class, 'store']);
         Route::get('legal-cases/{legalCase}', [LegalCaseController::class, 'show']);
-         });
+        Route::post('assign-lawyer', [LegalCaseController::class, 'assignDefendantLawyer']);
+        Route::post('add-opinion', [LegalCaseOpinionController::class, 'addOpinion']); 
+        Route::get('news', [LegalCaseNewsController::class, 'index']);   
+    });
 
     Route::get('home',HomeController::class);
     Route::get('countries',CountryController::class);

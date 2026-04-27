@@ -39,4 +39,21 @@ class LegalCaseRequest extends FormRequest
             'audios.*' => 'mimes:mp3,wav,m4a|max:10240',
         ];
     }
+
+    public function withValidator($validator)
+    {
+        $validator->after(function ($validator) {
+            $participants = $this->participants ?? [];
+
+            $roles = collect($participants)->pluck('role');
+
+            if (!$roles->contains('defendant')) {
+                $validator->errors()->add('participants', __('At least one defendant is required in the group to create a legal case'));
+            }
+
+            if (!$roles->contains('plaintiff_lawyer')) {
+                $validator->errors()->add('participants', __('At least one plaintiff lawyer is required in the group to create a legal case'));
+            }
+        });
+    }
 }

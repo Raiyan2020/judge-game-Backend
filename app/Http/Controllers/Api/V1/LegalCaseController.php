@@ -33,6 +33,7 @@ class LegalCaseController extends Controller
         $legalCase->load($this->relations());
         return \responder::success(new LegalCaseResource($legalCase));
     }
+    
 
 
     private function relations(): array
@@ -44,6 +45,7 @@ class LegalCaseController extends Controller
             'defendant.user',
             'defendantLawyer.user',
             'plaintiffLawyer.user',
+            'judge.user',
             'witnesses.user',
             'opinions.user',
             'opinions.media',

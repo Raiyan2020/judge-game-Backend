@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
-#[Fillable(['title', 'group_id', 'description', 'user_id', 'status', 'point_value', 'final_judgment', 'judged_by', 'judged_at', 'is_final'])]
+#[Fillable(['title', 'group_id', 'description', 'user_id', 'status', 'damages', 'final_judgment', 'judged_by', 'judged_at'])]
 class LegalCase extends Model implements HasMedia
 {
     use InteractsWithMedia;
@@ -55,6 +55,16 @@ class LegalCase extends Model implements HasMedia
     public function judge()
     {
         return $this->hasOne(LegalCaseParty::class)->where('role', CaseRole::JUDGE->value);
+    }
+
+    public function myRole()
+    {
+        if (!auth()->check()) {
+            return null;
+        }
+
+        $participant = $this->participants->firstWhere('user_id', auth()->id());
+        return $participant ? $participant->role : null;
     }
 
     public function witnesses()

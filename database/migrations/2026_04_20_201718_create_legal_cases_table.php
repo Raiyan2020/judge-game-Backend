@@ -22,11 +22,10 @@ return new class extends Migration
             $table->foreignIdFor(User::class)->constrained()->onDelete('cascade');
             $table->text('description')->nullable();
             $table->string('status')->default(LegalCaseStatus::NEW->value);
-            $table->integer('point_value')->default(0);
+            $table->text('damages')->nullable();
             $table->text('final_judgment')->nullable();          
             $table->foreignIdFor(User::class, 'judged_by')->nullable()->constrained('users')->nullOnDelete(); 
             $table->timestamp('judged_at')->nullable();          
-            $table->boolean('is_final')->default(false);        
             $table->timestamps();
         });
     }

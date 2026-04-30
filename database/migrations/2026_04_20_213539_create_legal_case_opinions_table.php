@@ -17,10 +17,11 @@ return new class extends Migration
             $table->id();
             $table->foreignIdFor(LegalCase::class)->constrained()->onDelete('cascade');
             $table->foreignIdFor(User::class)->constrained()->onDelete('cascade');  
-            $table->text('opinion');
+            $table->text('opinion')->nullable();
             $table->string('role')->nullable();
+            $table->string('stage')->nullable();
+            $table->json('legal_arguments')->nullable();
             $table->text('final_requests')->nullable();
-            $table->boolean('is_final')->default(false);
             $table->timestamps();
         });
     }

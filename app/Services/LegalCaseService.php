@@ -5,16 +5,23 @@ namespace App\Services;
 use App\Enums\CaseRole;
 use App\Enums\GroupRole;
 use App\Models\User;
+use App\Notifications\LegalCaseNotification;
 use App\Repositories\GroupRepository;
 use App\Repositories\LegalCaseRepository;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 
 class LegalCaseService
 {
-
-
     public function __construct(protected LegalCaseRepository $repo, protected GroupRepository $groupRepo) {}
+
+    public function index($filters, $groupId)
+     {
+         $filters['group_id'] = $groupId;
+         return $this->repo->index($filters);
+     } 
+   
 
     public function create($request)
     {
@@ -35,20 +42,20 @@ class LegalCaseService
                 'user_id' => $userId,
                 'role' => 'plaintiff',
             ];
-         
+
             $legalCase->participants()->createMany($participants);
             $legalCase->groupLaws()->attach($request['group_law_ids']);
             $this->createCaseNews($legalCase, $userId, $participants);
-
-
             DB::commit();
+
+            DB::afterCommit(function () use ($legalCase) {
+                $this->sendNotificationToPlaintiffLawyer($legalCase);
+            });
 
             return $legalCase;
         } catch (\Exception $e) {
             DB::rollBack();
-            
-
-           throw new \Exception(__('Failed to create legal case. Please try again later.'));
+            throw new \Exception(__('Failed to create legal case. Please try again later.'));
         }
     }
 
@@ -164,5 +171,30 @@ class LegalCaseService
         ]);
 
         return $case;
+    }
+
+    private function sendNotificationToPlaintiffLawyer($legalCase)
+    {
+        $plaintiffLawyer = $legalCase->plaintiffLawyer;
+        if ($plaintiffLawyer) {
+            $data = [
+                'model_id' => $legalCase->id,
+                'title' => [
+                    'ar' => 'قضية قانونية جديدة',
+                    'en' => 'New Legal Case',
+                ],
+                'body' => [
+                    'ar' => 'تم تعيينك كمحامي للمدعي في القضية رقم ' . $legalCase->id,
+                    'en' => 'You have been assigned as the plaintiff lawyer in case number ' . $legalCase->id,
+                ],
+                'type' => 'new_legal_case',
+            ];
+            Notification::send($plaintiffLawyer->user, new LegalCaseNotification($legalCase, $data));
+        }
+    }
+
+    public function getCasesStatus()
+    {
+        return $this->repo->getCasesStatus();
     }
 }

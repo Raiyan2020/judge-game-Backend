@@ -50,9 +50,12 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::post('ads', [AdsController::class, 'store']);
         Route::post('legal-cases', [LegalCaseController::class, 'store']);
         Route::get('legal-cases/{legalCase}', [LegalCaseController::class, 'show']);
+        Route::get('legal-cases/groups/{group}', [LegalCaseController::class, 'index']);
+        Route::get('legal-cases-status', [LegalCaseController::class, 'getCaseStatus']);
         Route::post('assign-lawyer', [LegalCaseController::class, 'assignDefendantLawyer']);
         Route::post('add-opinion', [LegalCaseOpinionController::class, 'addOpinion']); 
         Route::get('news', [LegalCaseNewsController::class, 'index']);   
+
     });
 
     Route::get('home',HomeController::class);

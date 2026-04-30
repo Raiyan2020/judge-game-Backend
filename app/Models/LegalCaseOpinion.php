@@ -7,10 +7,13 @@ use Illuminate\Database\Eloquent\Model;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
-#[Fillable(['legal_case_id', 'opinion', 'role', 'final_requests', 'is_final','user_id'])]
+#[Fillable(['legal_case_id', 'opinion', 'role', 'final_requests', 'legal_arguments','stage','user_id'])]
 class LegalCaseOpinion extends Model implements HasMedia
 {
     use InteractsWithMedia;
+    protected $casts = [
+        'legal_arguments' => 'array',
+    ];
 
     public function user()
     {

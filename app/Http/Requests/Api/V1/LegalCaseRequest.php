@@ -27,7 +27,7 @@ class LegalCaseRequest extends FormRequest
             'group_id' => 'required|integer|exists:groups,id',
             'group_law_ids' => 'required|array|min:1',
             'group_law_ids.*' => 'integer|exists:group_laws,id',
-            'point_value' => 'nullable|integer',
+            'damages' => 'required|string',
             'participants' => 'required|array|min:1',
             'participants.*.user_id' => 'required|integer|exists:users,id',
             'participants.*.role' => 'required|string|in:defendant,witness,plaintiff_lawyer',

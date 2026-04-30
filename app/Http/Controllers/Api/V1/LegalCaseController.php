@@ -5,14 +5,29 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\AssignDefendantLawyerRequest;
 use App\Http\Requests\Api\V1\LegalCaseRequest;
+use App\Http\Resources\Api\V1\BaseCollection;
+use App\Http\Resources\Api\V1\LegalCaseListResource;
 use App\Http\Resources\Api\V1\LegalCaseResource;
 use App\Models\LegalCase;
 use App\Services\LegalCaseService;
-use PhpParser\Node\Expr\Assign;
+use Illuminate\Http\Request;
 
 class LegalCaseController extends Controller
 {
     public function __construct(protected  LegalCaseService $legalCaseService) {}
+
+    public function index(Request $request, $group)
+    {
+        $legalCases = $this->legalCaseService->index($request->all(), $group);
+        return \responder::success((new BaseCollection($legalCases, LegalCaseListResource::class))->toArray(request()));
+
+    }
+
+    public function getCaseStatus()
+    {
+        $legalCases = $this->legalCaseService->getCasesStatus();
+        return \responder::success($legalCases);
+    }
 
     public function store(LegalCaseRequest $request)
     {

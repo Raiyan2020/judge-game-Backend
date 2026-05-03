@@ -48,6 +48,16 @@ class LegalCaseNews extends Model
             case 'case_first_judgment':
                 return $this->content . " " . __('by') . " " . $this->actor?->name;    
 
+            case 'case_final_judgment':
+                return $this->content . " " . __('by') . " " . $this->actor?->name;
+            case 'case_appeal_requested':
+                return $this->content . " " . __('by') . " " . $this->actor?->name;
+                
+            case 'case_appeal_accepted':
+                return $this->content . " " . __('by') . " " . $this->actor?->name;
+            case 'case_acceptance_ruling':
+                return $this->content . " " . __('by') . " " . $this->actor?->name;
+
             default:
                 return $this->content;
         }

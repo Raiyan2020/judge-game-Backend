@@ -50,6 +50,8 @@ class LegalCaseJudgmentController extends Controller
             'opinions.media',
             'media',
             'judgments',
+            'finalJudgment',
+            'firstInstanceJudgment',
         ];
     }
 }

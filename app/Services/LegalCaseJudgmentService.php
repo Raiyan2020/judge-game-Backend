@@ -74,6 +74,98 @@ class LegalCaseJudgmentService
         }
     }
 
+    public function storeFinalJudgment(array $data)
+    {
+        try {
+            DB::beginTransaction();
+
+            $legalCase = $this->legalCaseRepo->find($data['legal_case_id']);
+
+            if (! $legalCase) {
+                throw ValidationException::withMessages([
+                    'legal_case_id' => __('Legal case not found'),
+                ]);
+            }
+
+            $this->ensureUserIsJudge($legalCase);
+            $this->ensureCaseIsNotClosed($legalCase);
+
+            if ($legalCase->finalJudgment) {
+                throw ValidationException::withMessages([
+                    'legal_case_id' => __('A final judgment already exists for this case'),
+                ]);
+            }
+
+            $judgment = $this->judgmentRepo->create([
+                'legal_case_id' => $legalCase->id,
+                'judgment_type' => $data['judgment_type'],
+                'stage' => LegalCaseJudgmentStage::APPEAL->value,
+                'judgment_text' => $data['judgment_text'],
+                'judged_by' => auth()->id(),
+                'is_final' => true,
+            ]);
+
+            $legalCase->update(['status' => LegalCaseStatus::EXECUTION->value]);
+
+            $this->createFinalJudgmentNews($legalCase, $judgment);
+
+            DB::commit();
+
+            return $legalCase;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
+
+    private function createFinalJudgmentNews(LegalCase $legalCase, $judgment): void
+    {
+        $message = $this->getFinalJudgmentNotificationData($judgment , $legalCase);
+
+        $this->legalCaseRepo->createCaseNews(
+            $legalCase,
+            'case_final_judgment',
+            $message,
+            auth()->id(),
+            $legalCase->defendant?->user_id
+        );
+
+        $notificationData = [
+            'model_id' => $legalCase->id,
+            'title' => [
+                'ar' => 'حكم نهائي',
+                'en' => 'Final Judgment',
+            ],
+            'body' => $message,
+            'type' => 'final_judgment',
+        ];
+
+        $users = User::whereIn('id', $this->getJudgmentRecipients($legalCase))->get();
+        Notification::send($users, new LegalCaseNotification($legalCase, $notificationData));
+    }
+
+    private function getFinalJudgmentNotificationData($judgment , $legalCase): array
+    {
+        return match ($judgment->judgment_type) {
+            LegalCaseJudgmentType::CONVICTION->value => [
+                'ar' => 'صدر حكم نهائي بالإدانة للقضيه رقم ' . $legalCase->id,
+                'en' => 'A final judgment of conviction was issued for case number ' . $legalCase->id,
+            ],
+            LegalCaseJudgmentType::ACQUITTAL->value => [
+                'ar' => 'صدر حكم نهائي بالبراءة  للقضيه رقم ' . $legalCase->id,
+                'en' => 'A final judgment of acquittal was issued for case number ' . $legalCase->id,
+            ],
+            LegalCaseJudgmentType::DISMISSED->value => [
+                'ar' => 'صدر حكم نهائي بالرفض للقضيه رقم ' . $legalCase->id,
+                'en' => 'A final judgment of dismissal was issued for case number ' . $legalCase->id,
+            ],
+            default => [
+                'ar' => 'صدر حكم نهائي في القضية رقم ' . $legalCase->id,
+                'en' => 'A final judgment was issued for case number ' . $legalCase->id,
+            ],
+        };
+    }
+
     private function ensureUserIsJudge(LegalCase $legalCase): void
     {
         $judge = $legalCase->judge;
@@ -96,7 +188,7 @@ class LegalCaseJudgmentService
 
     private function createCaseNews(LegalCase $legalCase, $judgment): void
     {
-        $message = $this->getJudgmentNotificationData($judgment);
+        $message = $this->getJudgmentNotificationData($judgment, $legalCase);
         $recipients = $this->getJudgmentRecipients($legalCase);
 
         $this->legalCaseRepo->createCaseNews(
@@ -122,24 +214,24 @@ class LegalCaseJudgmentService
         Notification::send($users, new LegalCaseNotification($legalCase, $notificationData));
     }
 
-    private function getJudgmentNotificationData($judgment): array
+    private function getJudgmentNotificationData($judgment , $legalCase): array
     {
         return match ($judgment->judgment_type) {
             LegalCaseJudgmentType::CONVICTION->value => [
-                'ar' => 'حُكمت القضية بالإدانة رقم ' . $judgment->id,
-                'en' => 'The case was judged as conviction number ' . $judgment->id,
+                'ar' => 'صدر حكم اولي بالإدانة للقضيه رقم ' . $legalCase->id,
+                'en' => 'The case was judged as conviction number ' . $legalCase->id,
             ],
             LegalCaseJudgmentType::ACQUITTAL->value => [
-                'ar' => 'حُكمت القضية بالبراءة رقم ' . $judgment->id,
-                'en' => 'The case was judged as acquittal number ' . $judgment->id,
+                'ar' => 'صدر حكم اولي بالبراءة  للقضيه رقم ' . $legalCase->id,
+                'en' => 'The case was judged as acquittal number ' . $legalCase->id,
             ],
             LegalCaseJudgmentType::DISMISSED->value => [
-                'ar' => 'حُكمت القضية بالرفض رقم ' . $judgment->id,
-                'en' => 'The case was judged as dismissed number ' . $judgment->id,
+                'ar' => 'صدر حكم اولي بالرفض للقضيه رقم ' . $legalCase->id,
+                'en' => 'The case was judged as dismissed number ' . $legalCase->id,
             ],
             default => [
-                'ar' => 'تم الحكم في القضية رقم ' . $judgment->id,
-                'en' => 'The case judgment was recorded number ' . $judgment->id,
+                'ar' => 'صدر حكم اولي في القضية رقم ' . $legalCase->id,
+                'en' => 'The case judgment was recorded number ' . $legalCase->id,
             ],
         };
     }
@@ -170,6 +262,10 @@ class LegalCaseJudgmentService
             $recipients[] = $legalCase->consultant->user_id;
         }
 
+        if ($legalCase->judge) {
+            $recipients[] = $legalCase->judge->user_id;
+        }
+
         return array_unique($recipients);
     }
 
@@ -193,10 +289,10 @@ class LegalCaseJudgmentService
             }
 
             $this->createAcceptanceNews($legalCase, $judgment);
+            DB::commit();
 
             return $legalCase;
 
-            DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
             throw $e;
@@ -248,8 +344,8 @@ class LegalCaseJudgmentService
     private function getAcceptanceRulingMessage($judgment): array
     {
         return [
-            'ar' => 'تم قبول حكم الإدانة رقم ' . $judgment->id . ' من قبل محامي الدفاع',
-            'en' => 'The conviction judgment number ' . $judgment->id . ' has been accepted by the defendant lawyer',
+            'ar' => 'تم قبول حكم الإدانة  للقضية رقم ' . $judgment->id . ' من قبل محامي الدفاع',
+            'en' => 'The conviction judgment for case number ' . $judgment->id . ' has been accepted by the defendant lawyer',
         ];
     }
 }

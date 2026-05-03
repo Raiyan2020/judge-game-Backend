@@ -106,6 +106,142 @@ class LegalCaseOpinionServices
             ? LegalCaseStatus::NEW->value
             : LegalCaseStatus::APPEAL->value;
     }
+
+    public function requestAppeal(array $request)
+    {
+        try {
+            DB::beginTransaction();
+
+            $legalCase = $this->repo->find($request['legal_case_id']);
+
+            if (!$legalCase) {
+                throw ValidationException::withMessages([
+                    'legal_case_id' => __('Legal case not found'),
+                ]);
+            }
+
+            if ($legalCase->status === LegalCaseStatus::CLOSED->value) {
+                throw ValidationException::withMessages([
+                    'legal_case_id' => __('Cannot request appeal for a closed case'),
+                ]);
+            }
+
+            if ($legalCase->status !== LegalCaseStatus::ONGOING->value) {
+                throw ValidationException::withMessages([
+                    'legal_case_id' => __('Appeal can only be requested for ongoing cases'),
+                ]);
+            }
+
+            if ($legalCase->status === LegalCaseStatus::APPEAL->value) {
+                throw ValidationException::withMessages([
+                    'legal_case_id' => __('This case is already under appeal'),
+                ]);
+            }
+
+            $role = $this->getAppealRequesterRole($legalCase);
+
+            $legalCase->update(['status' => LegalCaseStatus::APPEAL->value]);
+
+            $opinionData = [
+                'user_id' => auth()->id(),
+                'opinion' => $request['opinion'] ?? null,
+                'role' => $role,
+                'stage' => LegalCaseStatus::APPEAL->value,
+            ];
+
+            $legalCaseOpinion = $legalCase->opinions()->create($opinionData);
+
+        
+
+            $this->createAppealNews($legalCase, $role);
+
+            DB::afterCommit(function () use ($legalCase) {
+                $this->notifyJudgeOnAppealRequest($legalCase);
+            });
+
+            DB::commit();
+
+            return $legalCase;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
+
+    private function getAppealRequesterRole($legalCase): string
+    {
+        $user = auth()->user();
+
+        $participant = $legalCase->participants()
+            ->where('user_id', $user->id)
+            ->first();
+
+        if ($participant) {
+            $allowedRoles = [
+                CaseRole::PLAINTIFF_LAWYER->value,
+                CaseRole::DEFENDANT_LAWYER->value,
+                CaseRole::CONSULTANT->value,
+            ];
+
+            if (in_array($participant->role, $allowedRoles)) {
+                return $participant->role;
+            }
+
+            throw ValidationException::withMessages([
+                'user' => __('Only plaintiff lawyer, defendant lawyer, or consultant may request appeal'),
+            ]);
+        }
+
+        if ($legalCase->group?->users()
+            ->where('user_id', $user->id)
+            ->wherePivot('role', CaseRole::CONSULTANT->value)
+            ->exists()
+        ) {
+            return CaseRole::CONSULTANT->value;
+        }
+
+        throw ValidationException::withMessages([
+            'user' => __('Only plaintiff lawyer, defendant lawyer, or consultant may request appeal'),
+        ]);
+    }
+
+    private function createAppealNews($legalCase, string $role): void
+    {
+        $this->repo->createCaseNews(
+            $legalCase,
+            'case_appeal_request',
+            [
+                'ar' => 'تم طلب استئناف للقضية رقم ' . $legalCase->id ,
+                'en' => 'An appeal request was made for the case number ' . $legalCase->id ,
+            ],
+            auth()->id(),
+            $legalCase->judge?->user_id
+        );
+    }
+
+    private function notifyJudgeOnAppealRequest($legalCase): void
+    {
+        $judge = $legalCase->judge;
+        if (! $judge || ! $judge->user) {
+            return;
+        }
+
+        $data = [
+            'model_id' => $legalCase->id,
+            'title' => [
+                'ar' => 'طلب استئناف',
+                'en' => 'Appeal Request',
+            ],
+            'body' => [
+                'ar' => 'تم طلب الاستئناف للقضية رقم ' . $legalCase->id,
+                'en' => 'An appeal has been requested for case number ' . $legalCase->id,
+            ],
+            'type' => 'appeal_request',
+        ];
+
+        Notification::send($judge->user, new LegalCaseNotification($legalCase, $data));
+    }
+
     private function resolveRole($legalCase): string
     {
         $user = auth()->user();

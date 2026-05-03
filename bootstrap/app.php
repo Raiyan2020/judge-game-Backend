@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Foundation\Configuration\Schedule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -33,6 +34,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
 
         ]);
+    })
+    ->withSchedule(function (Schedule $schedule) {
+        $schedule->job(new \App\Jobs\CloseExpiredExecutionCases)->daily();
+        $schedule->job(new \App\Jobs\ProcessExpiredPolls)->hourly();
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (ValidationException $e, Request $request) {

@@ -15,7 +15,6 @@ class LegalCaseOpinionResource extends JsonResource
             'role' => $this->role,
             'opinion' => $this->opinion,
             'final_requests' => $this->final_requests,
-            'is_final' => (bool) $this->is_final,
             'images' =>  $this->relationLoaded('media') ? MediaResource::collection($this->getMedia('images')) :[],
             'videos' =>  $this->relationLoaded('media') ? MediaResource::collection($this->getMedia('videos')) :[],
             'audios' =>  $this->relationLoaded('media') ? MediaResource::collection($this->getMedia('audios')) :[],

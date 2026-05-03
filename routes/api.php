@@ -55,9 +55,12 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::get('legal-cases-status', [LegalCaseController::class, 'getCaseStatus']);
         Route::post('assign-lawyer', [LegalCaseController::class, 'assignDefendantLawyer']);
         Route::post('add-opinion', [LegalCaseOpinionController::class, 'addOpinion']);
+        Route::post('request-appeal', [LegalCaseOpinionController::class, 'requestAppeal']);
         Route::post('add-first-judgment', [LegalCaseJudgmentController::class, 'storeFirstJudgment']);
         Route::post('add-final-judgment', [LegalCaseJudgmentController::class, 'storeFinalJudgment']);
         Route::post('accept-judgment', [LegalCaseJudgmentController::class, 'acceptJudgment']);
+        Route::post('add-appeal-request', [LegalCaseOpinionController::class, 'requestAppeal']);
+        Route::post('add-final-judgment', [LegalCaseJudgmentController::class, 'storeFinalJudgment']);
         Route::get('news', [LegalCaseNewsController::class, 'index']);   
     }); 
 

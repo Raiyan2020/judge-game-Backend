@@ -65,6 +65,9 @@ class LegalCaseController extends Controller
             'opinions.user',
             'opinions.media',
             'media',
+            'judgments',
+            'finalJudgment',
+            'firstInstanceJudgment',
         ];
     }
 }

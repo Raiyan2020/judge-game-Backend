@@ -45,6 +45,8 @@ class LegalCaseNews extends Model
                 return $this->content . " " . __('against') . " " . $this->actor?->name;
             case 'opinion_added':
                 return "تم إضافة رأي جديد";
+            case 'case_first_judgment':
+                return $this->content . " " . __('by') . " " . $this->actor?->name;    
 
             default:
                 return $this->content;

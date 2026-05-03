@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\LastUpdateController;
 use App\Http\Controllers\Api\V1\LegalCaseController;
 use App\Http\Controllers\Api\V1\LegalCaseNewsController;
 use App\Http\Controllers\Api\V1\LegalCaseOpinionController;
+use App\Http\Controllers\Api\V1\LegalCaseJudgmentController;
 use App\Http\Controllers\Api\V1\MessageController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\SettingController;
@@ -53,10 +54,12 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::get('legal-cases/groups/{group}', [LegalCaseController::class, 'index']);
         Route::get('legal-cases-status', [LegalCaseController::class, 'getCaseStatus']);
         Route::post('assign-lawyer', [LegalCaseController::class, 'assignDefendantLawyer']);
-        Route::post('add-opinion', [LegalCaseOpinionController::class, 'addOpinion']); 
+        Route::post('add-opinion', [LegalCaseOpinionController::class, 'addOpinion']);
+        Route::post('add-first-judgment', [LegalCaseJudgmentController::class, 'storeFirstJudgment']);
+        Route::post('add-final-judgment', [LegalCaseJudgmentController::class, 'storeFinalJudgment']);
+        Route::post('accept-judgment', [LegalCaseJudgmentController::class, 'acceptJudgment']);
         Route::get('news', [LegalCaseNewsController::class, 'index']);   
-
-    });
+    }); 
 
     Route::get('home',HomeController::class);
     Route::get('countries',CountryController::class);

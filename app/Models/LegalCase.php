@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\CaseRole;
+use App\Models\LegalCaseJudgment;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\MediaLibrary\HasMedia;
@@ -33,6 +34,23 @@ class LegalCase extends Model implements HasMedia
         return $this->hasMany(LegalCaseOpinion::class);
     }
 
+    public function judgments()
+    {
+        return $this->hasMany(LegalCaseJudgment::class);
+    }
+
+    public function firstInstanceJudgment()
+    {
+        return $this->hasOne(LegalCaseJudgment::class)
+            ->where('stage', \App\Enums\LegalCaseJudgmentStage::FIRST_INSTANCE->value);
+    }
+
+    public function finalJudgment()
+    {
+        return $this->hasOne(LegalCaseJudgment::class)
+            ->where('is_final', true);
+    }
+
     public function plaintiff()
     {
         return $this->hasOne(LegalCaseParty::class)->where('role', CaseRole::PLAINTIFF->value);
@@ -55,6 +73,11 @@ class LegalCase extends Model implements HasMedia
     public function judge()
     {
         return $this->hasOne(LegalCaseParty::class)->where('role', CaseRole::JUDGE->value);
+    }
+
+    public function consultant()
+    {
+        return $this->hasOne(LegalCaseParty::class)->where('role', CaseRole::CONSULTANT->value);
     }
 
     public function myRole()

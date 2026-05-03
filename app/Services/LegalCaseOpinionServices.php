@@ -54,7 +54,7 @@ class LegalCaseOpinionServices
             return $legalCase;
         } catch (\Exception $e) {
             DB::rollBack();
-            throw new \Exception(__('Failed to add opinion. Please try again later.'));
+            throw $e;
         }
     }
 

@@ -42,6 +42,10 @@ class LegalCaseService
                 'user_id' => $userId,
                 'role' => 'plaintiff',
             ];
+            $participants[] = [
+                'user_id' => $group->owner_id,
+                'role' => 'judge',
+            ];
 
             $legalCase->participants()->createMany($participants);
             $legalCase->groupLaws()->attach($request['group_law_ids']);

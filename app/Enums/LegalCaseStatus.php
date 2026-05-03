@@ -5,7 +5,8 @@ namespace App\Enums;
 enum LegalCaseStatus: string
 {
     case NEW = 'new';
-    case IN_PROGRESS = 'in_progress';
+    case ONGOING = 'ongoing';
     case APPEAL = 'appeal';
+    case EXECUTION = 'execution';
     case CLOSED = 'closed';
 }

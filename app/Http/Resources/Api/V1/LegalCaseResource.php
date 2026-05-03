@@ -3,7 +3,9 @@
 namespace App\Http\Resources\Api\V1;
 
 use App\Enums\CaseRole;
+use App\Enums\LegalCaseJudgmentStage;
 use App\Enums\LegalCaseStatus;
+use App\Http\Resources\Api\V1\LegalCaseJudgmentResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -19,7 +21,7 @@ class LegalCaseResource extends JsonResource
             'status' => $this->status,
             'status_text' => __($this->status),
             'damages' => $this->damages,
-            'final_judgment' => $this->final_judgment,
+            'final_judgment' => $this->relationLoaded('finalJudgment') && $this->finalJudgment ? $this->finalJudgment?->judgment_type : null,
 
             'group' =>  $this->relationLoaded('group') ? [
                 'id' => $this->group?->id,
@@ -83,6 +85,7 @@ class LegalCaseResource extends JsonResource
                 ],
                 'witnesses' => LegalCaseOpinionResource::collection($this->opinionsByRole(CaseRole::WITNESS->value)),
             ],
+            'judgment' => $this->relationLoaded('judgments') ? LegalCaseJudgmentResource::collection($this->judgments) : [],
             'images' =>  $this->relationLoaded('media') ? MediaResource::collection($this->getMedia('images')) :[],
             'videos' =>  $this->relationLoaded('media') ? MediaResource::collection($this->getMedia('videos')) :[],
             'audios' =>  $this->relationLoaded('media') ? MediaResource::collection($this->getMedia('audios')) :[],

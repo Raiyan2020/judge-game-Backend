@@ -44,7 +44,7 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::post('groups/{group}/invite', [GroupMemberController::class, 'inviteMember']);
         Route::post('groups/{group}/accept', [GroupMemberController::class, 'acceptInvitation']);
         Route::post('groups/{group}/reject', [GroupMemberController::class, 'rejectInvitation']);
-        Route::apiResource('group-laws', GroupLawController::class)->only([ 'store', 'update', 'destroy']);
+        Route::apiResource('group-laws', GroupLawController::class)->only(['store', 'update', 'destroy']);
         Route::get('group-laws/{group}', [GroupLawController::class, 'index']);
         Route::get('groups/{group}/messages', [MessageController::class, 'getGroupMessages']);
         Route::get('private-messages', [MessageController::class, 'getPrivateMessages']);
@@ -52,34 +52,32 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::get('chats', [MessageController::class, 'getChats']);
         Route::post('messages/{messageId}/vote', [MessageController::class, 'votePoll']);
         Route::post('ads', [AdsController::class, 'store']);
-        Route::post('legal-cases', [LegalCaseController::class, 'store']);
         Route::get('legal-cases/{legalCase}', [LegalCaseController::class, 'show']);
         Route::get('legal-cases/groups/{group}', [LegalCaseController::class, 'index']);
         Route::get('legal-cases-status', [LegalCaseController::class, 'getCaseStatus']);
-        Route::post('assign-lawyer', [LegalCaseController::class, 'assignDefendantLawyer']);
-        Route::post('add-opinion', [LegalCaseOpinionController::class, 'addOpinion']);
-        Route::post('request-appeal', [LegalCaseOpinionController::class, 'requestAppeal']);
-        Route::post('add-first-judgment', [LegalCaseJudgmentController::class, 'storeFirstJudgment']);
-        Route::post('add-final-judgment', [LegalCaseJudgmentController::class, 'storeFinalJudgment']);
-        Route::post('accept-judgment', [LegalCaseJudgmentController::class, 'acceptJudgment']);
-        Route::post('add-appeal-request', [LegalCaseOpinionController::class, 'requestAppeal']);
-        Route::post('add-final-judgment', [LegalCaseJudgmentController::class, 'storeFinalJudgment']);
         Route::get('news', [LegalCaseNewsController::class, 'index']);
         Route::get('packages', [PackageController::class, 'index']);
         Route::post('packages/subscribe', [PackageSubscriptionController::class, 'subscribe']);
-        Route::post('coupons',[CouponController::class,'store']);
+        Route::post('coupons', [CouponController::class, 'store']);
+        Route::group(['middleware' => 'checkActiveSubscription'], function () {
+            Route::post('legal-cases', [LegalCaseController::class, 'store']);
+            Route::post('assign-lawyer', [LegalCaseController::class, 'assignDefendantLawyer']);
+            Route::post('add-opinion', [LegalCaseOpinionController::class, 'addOpinion']);
+            Route::post('request-appeal', [LegalCaseOpinionController::class, 'requestAppeal']);
+            Route::post('add-first-judgment', [LegalCaseJudgmentController::class, 'storeFirstJudgment']);
+            Route::post('add-final-judgment', [LegalCaseJudgmentController::class, 'storeFinalJudgment']);
+            Route::post('accept-judgment', [LegalCaseJudgmentController::class, 'acceptJudgment']);
+            Route::post('add-appeal-request', [LegalCaseOpinionController::class, 'requestAppeal']);
+            Route::post('add-final-judgment', [LegalCaseJudgmentController::class, 'storeFinalJudgment']);
+        });
+    });
 
-    }); 
-
-    Route::get('home',HomeController::class);
+    Route::get('home', HomeController::class);
     Route::get('banners', [BannerController::class, 'index']);
-    Route::get('countries',CountryController::class);
+    Route::get('countries', CountryController::class);
     Route::get('last-updates', LastUpdateController::class);
     Route::post('contact', [ContactController::class, 'store']);
     Route::get('contact-settings', [SettingController::class, 'contactSettings']);
     Route::get('setting-pages', [SettingController::class, 'getSettingsPages']);
     Route::get('setting-laws', [SettingController::class, 'getSettingsLaws']);
-
-
-
 });

@@ -22,8 +22,8 @@ class PackageSubscriptionResource extends JsonResource
             'price' => $this->price,
             'discount' => $this->discount,
             'total' => $this->total,
-            'starts_at' => $this->starts_at->format('Y-m-d H:i:s'),
-            'ends_at' => $this->ends_at?->format('Y-m-d H:i:s') ?? __('unlimited'),
+            'starts_at' => $this->starts_at->format('Y-m-d'),
+            'ends_at' => $this->ends_at?->format('Y-m-d') ?? __('unlimited'),
            
         ];
     }

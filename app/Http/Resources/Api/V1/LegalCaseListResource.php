@@ -35,7 +35,24 @@ class LegalCaseListResource extends JsonResource
                 'name' => $this->defendantLawyer?->user?->name,
                 'image' => $this->defendantLawyer?->user?->image,
             ] : null,
+            'remaining_execution_days' => $this->status === 'execution'
+                ? $this->calculateRemainingExecutionDays()
+                : null,
             'created_at' => $this->created_at->format('d/m/Y'),
         ];
     }
+
+    private function calculateRemainingExecutionDays(): int
+    {
+        $finalJudgment = $this->finalJudgment;
+
+        if (! $finalJudgment || ! $finalJudgment->created_at) {
+            return 0;
+        }
+
+        $deadline = $finalJudgment->created_at->copy()->addDays(7);
+
+        return max(0, now()->diffInDays($deadline, false));
+    }
 }
+

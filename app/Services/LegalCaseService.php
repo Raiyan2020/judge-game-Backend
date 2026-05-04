@@ -27,6 +27,7 @@ class LegalCaseService
     {
         try {
             DB::beginTransaction();
+           
             $userId = auth()->id();
             $participants = $request['participants'];
             $request['user_id'] = $userId;
@@ -43,7 +44,7 @@ class LegalCaseService
                 'role' => 'plaintiff',
             ];
             $participants[] = [
-                'user_id' => $group->owner_id,
+                'user_id' => $group->user_id,
                 'role' => 'judge',
             ];
 
@@ -59,7 +60,7 @@ class LegalCaseService
             return $legalCase;
         } catch (\Exception $e) {
             DB::rollBack();
-            throw new \Exception(__('Failed to create legal case. Please try again later.'));
+            throw $e;
         }
     }
 

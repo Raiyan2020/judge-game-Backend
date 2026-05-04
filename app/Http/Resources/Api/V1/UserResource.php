@@ -31,6 +31,7 @@ class UserResource extends JsonResource
             'status' => $this->status,
             'status_text' => __($this->status),
             'member_since' => $this->created_at->locale(app()->getLocale())->translatedFormat('j-F-Y'),
+            'current_subscription' => new PackageSubscriptionResource($this->whenLoaded('activeSubscription')),
         ];
     }
 }

@@ -36,4 +36,16 @@ class User extends Authenticatable
             ->withPivot('role', 'status', 'title')
             ->withTimestamps();
     }
+
+    public function subscriptions()
+    {
+        return $this->hasMany(PackageSubscription::class);
+    }
+
+    public function activeSubscription()
+    {
+        return $this->subscriptions()->paid()->where(function ($query) {
+            $query->whereNull('ends_at')->orWhere('ends_at', '>', now());
+        })->latest()->first();
+    }
 }

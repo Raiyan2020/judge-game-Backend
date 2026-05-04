@@ -44,7 +44,7 @@ class AuthController extends Controller
   public function verifyCode(CheckCodeRequest $request)
   {
     $user = $this->authService->checkCode($request->validated());
-    if ($user)  return \responder::success(new UserResource($user));
+    if ($user)  return \responder::success(new UserResource($user->load('activeSubscription.package')));
 
     return \responder::error(__('Error verification code try again'));
   }

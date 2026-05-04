@@ -4,17 +4,19 @@ use App\Http\Controllers\Api\V1\AdsController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ContactController;
 use App\Http\Controllers\Api\V1\CountryController;
+use App\Http\Controllers\Api\V1\CouponController;
 use App\Http\Controllers\Api\V1\GroupController;
 use App\Http\Controllers\Api\V1\GroupLawController;
-use App\Http\Controllers\Api\V1\GroupLawRequestController;
 use App\Http\Controllers\Api\V1\GroupMemberController;
 use App\Http\Controllers\Api\V1\HomeController;
 use App\Http\Controllers\Api\V1\LastUpdateController;
 use App\Http\Controllers\Api\V1\LegalCaseController;
+use App\Http\Controllers\Api\V1\LegalCaseJudgmentController;
 use App\Http\Controllers\Api\V1\LegalCaseNewsController;
 use App\Http\Controllers\Api\V1\LegalCaseOpinionController;
-use App\Http\Controllers\Api\V1\LegalCaseJudgmentController;
 use App\Http\Controllers\Api\V1\MessageController;
+use App\Http\Controllers\Api\V1\PackageController;
+use App\Http\Controllers\Api\V1\PackageSubscriptionController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\SettingController;
 use Illuminate\Support\Facades\Route;
@@ -61,7 +63,11 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::post('accept-judgment', [LegalCaseJudgmentController::class, 'acceptJudgment']);
         Route::post('add-appeal-request', [LegalCaseOpinionController::class, 'requestAppeal']);
         Route::post('add-final-judgment', [LegalCaseJudgmentController::class, 'storeFinalJudgment']);
-        Route::get('news', [LegalCaseNewsController::class, 'index']);   
+        Route::get('news', [LegalCaseNewsController::class, 'index']);
+        Route::get('packages', [PackageController::class, 'index']);
+        Route::post('packages/subscribe', [PackageSubscriptionController::class, 'subscribe']);
+        Route::post('coupons',[CouponController::class,'store']);
+
     }); 
 
     Route::get('home',HomeController::class);

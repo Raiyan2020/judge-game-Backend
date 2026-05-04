@@ -21,7 +21,7 @@ class ProfileController extends Controller
      */
     public function show(Request $request)
     {
-        return \responder::success(new UserResource($request->user()));
+        return \responder::success(new UserResource($request->user()->load('activeSubscription.package')));
     }
 
     /**
@@ -35,7 +35,7 @@ class ProfileController extends Controller
         $user = $request->user();
         $updated = $this->userService->updateProfile($user, $request->validated());
 
-        return \responder::success(new UserResource($updated));
+        return \responder::success(new UserResource($updated->load('activeSubscription.package')));
     }
 
     /**
@@ -49,6 +49,6 @@ class ProfileController extends Controller
         $user = $request->user();
         $updated = $this->userService->updateSettings($user, $request->validated());
 
-        return \responder::success(new UserResource($updated));
+        return \responder::success(new UserResource($updated->load('activeSubscription.package')));
     }
 }

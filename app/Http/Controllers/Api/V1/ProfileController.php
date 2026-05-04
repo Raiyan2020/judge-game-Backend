@@ -21,7 +21,9 @@ class ProfileController extends Controller
      */
     public function show(Request $request)
     {
-        return \responder::success(new UserResource($request->user()->load('activeSubscription.package')));
+        $user = auth()->user();
+
+        return \responder::success(new UserResource($user->load('activeSubscription.package')));
     }
 
     /**

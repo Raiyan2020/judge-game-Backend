@@ -17,7 +17,6 @@ class BannerRepository extends BaseRepository
 
     public function index()
     {
-        return $this->model->active()->latest()->get();
-        
+       return $this->model->active()->latest()->get();
     }
 }

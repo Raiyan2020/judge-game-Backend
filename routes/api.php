@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AdsController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\BannerController;
 use App\Http\Controllers\Api\V1\ContactController;
 use App\Http\Controllers\Api\V1\CountryController;
 use App\Http\Controllers\Api\V1\CouponController;
@@ -71,6 +72,7 @@ Route::group(['middleware' => 'setLocale'], function () {
     }); 
 
     Route::get('home',HomeController::class);
+    Route::get('banners', [BannerController::class, 'index']);
     Route::get('countries',CountryController::class);
     Route::get('last-updates', LastUpdateController::class);
     Route::post('contact', [ContactController::class, 'store']);

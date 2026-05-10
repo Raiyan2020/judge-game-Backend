@@ -45,11 +45,16 @@ class User extends Authenticatable
     public function activeSubscription()
     {
         return $this->hasOne(PackageSubscription::class)
-        ->paid()
-        ->where(function ($query) {
-            $query->whereNull('ends_at')
-                  ->orWhere('ends_at', '>', now());
-        })
-        ->latestOfMany();
+            ->paid()
+            ->where(function ($query) {
+                $query->whereNull('ends_at')
+                    ->orWhere('ends_at', '>', now());
+            })
+            ->latestOfMany();
+    }
+
+    public function groupPermissions()
+    {
+        return $this->hasMany(GroupUserPermission::class);
     }
 }

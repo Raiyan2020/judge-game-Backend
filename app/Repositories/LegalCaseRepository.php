@@ -2,7 +2,11 @@
 
 namespace App\Repositories;
 
+use App\Enums\LegalCaseJudgmentStage;
+use App\Enums\LegalCaseJudgmentType;
+use App\Enums\LegalCaseStatus;
 use App\Models\LegalCase;
+use App\Models\LegalCaseJudgment;
 
 class LegalCaseRepository extends BaseRepository
 {
@@ -50,7 +54,52 @@ class LegalCaseRepository extends BaseRepository
             COUNT(CASE WHEN status = 'closed' THEN 1 END) as closed_cases
         ")
         ->first();
-
     }
-  
+
+    public function getUserGroupStatistics(int $userId, int $groupId): array
+    {
+        $userCasesQuery = $this->model->newQuery()
+            ->where('group_id', $groupId)
+            ->whereHas('participants', function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            });
+
+        $raisedCases = $this->model->newQuery()
+            ->where('group_id', $groupId)
+            ->whereHas('plaintiff', function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })
+            ->count();
+
+        $defenseCases = $this->model->newQuery()
+            ->where('group_id', $groupId)
+            ->where(function ($query) use ($userId) {
+                $query->whereHas('defendant', function ($query) use ($userId) {
+                    $query->where('user_id', $userId);
+                })
+                ->orWhereHas('defendantLawyer', function ($query) use ($userId) {
+                    $query->where('user_id', $userId);
+                });
+            })
+            ->count();
+
+        $judgmentQuery = LegalCaseJudgment::query()
+            ->whereHas('legalCase', function ($query) use ($groupId, $userId) {
+                $query->where('group_id', $groupId)
+                    ->whereHas('participants', function ($query) use ($userId) {
+                        $query->where('user_id', $userId);
+                    });
+            });
+
+        return [
+            'closed_cases' => (clone $userCasesQuery)->where('status', LegalCaseStatus::CLOSED->value)->count(),
+            'raised_cases' => $raisedCases,
+            'defense_cases' => $defenseCases,
+            'ongoing_cases' => (clone $userCasesQuery)->where('status', LegalCaseStatus::ONGOING->value)->count(),
+            'execution_cases' => (clone $userCasesQuery)->where('status', LegalCaseStatus::EXECUTION->value)->count(),
+            'first_instance_judgments' => (clone $judgmentQuery)->where('stage', LegalCaseJudgmentStage::FIRST_INSTANCE->value)->count(),
+            'appeal_judgments' => (clone $judgmentQuery)->where('stage', LegalCaseJudgmentStage::APPEAL->value)->count(),
+            'acquittal_judgments' => (clone $judgmentQuery)->where('judgment_type', LegalCaseJudgmentType::ACQUITTAL->value)->count(),
+        ];
+    }
 }

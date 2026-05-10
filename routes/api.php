@@ -18,8 +18,10 @@ use App\Http\Controllers\Api\V1\LegalCaseOpinionController;
 use App\Http\Controllers\Api\V1\MessageController;
 use App\Http\Controllers\Api\V1\PackageController;
 use App\Http\Controllers\Api\V1\PackageSubscriptionController;
+use App\Http\Controllers\Api\V1\PermissionController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\SettingController;
+use App\Http\Controllers\Api\V1\UserStatisticsController;
 use Illuminate\Support\Facades\Route;
 
 Route::group(['middleware' => 'setLocale'], function () {
@@ -40,10 +42,17 @@ Route::group(['middleware' => 'setLocale'], function () {
 
         Route::apiResource('groups', GroupController::class)->only(['index', 'store']);
         Route::get('my-groups', [GroupController::class, 'myGroups']);
+        Route::post('groups/{group}/leave', [GroupController::class, 'leaveGroup']);
+        Route::delete('groups/{group}/members/{userId}', [GroupController::class, 'removeMember']);
+        Route::patch('groups/{group}/members/{userId}/role', [GroupController::class, 'changeRole']);
         Route::get('groups/{group}/members', [GroupMemberController::class, 'index']);
         Route::post('groups/{group}/invite', [GroupMemberController::class, 'inviteMember']);
         Route::post('groups/{group}/accept', [GroupMemberController::class, 'acceptInvitation']);
         Route::post('groups/{group}/reject', [GroupMemberController::class, 'rejectInvitation']);
+        Route::post('groups/{group}/users/{user}/remove-member', [GroupMemberController::class, 'removeMember']);
+        Route::post('groups/{group}/change-role', [GroupMemberController::class, 'changeRole']);
+        Route::post('groups/{group}/leave', [GroupMemberController::class, 'leaveGroup']);     
+
         Route::apiResource('group-laws', GroupLawController::class)->only(['store', 'update', 'destroy']);
         Route::get('group-laws/{group}', [GroupLawController::class, 'index']);
         Route::get('groups/{group}/messages', [MessageController::class, 'getGroupMessages']);
@@ -58,7 +67,10 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::get('news', [LegalCaseNewsController::class, 'index']);
         Route::get('packages', [PackageController::class, 'index']);
         Route::post('packages/subscribe', [PackageSubscriptionController::class, 'subscribe']);
+        Route::get('groups/{group}/users/{user}/statistics', [UserStatisticsController::class, 'show']);
         Route::post('coupons', [CouponController::class, 'store']);
+        Route::get('permissions', [PermissionController::class, 'index']);
+        Route::post('permissions', [PermissionController::class, 'togglePermission']);
         Route::group(['middleware' => 'checkActiveSubscription'], function () {
             Route::post('legal-cases', [LegalCaseController::class, 'store']);
             Route::post('assign-lawyer', [LegalCaseController::class, 'assignDefendantLawyer']);

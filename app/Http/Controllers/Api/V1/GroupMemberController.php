@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\Api\V1\UserResource;
+use App\Http\Requests\Api\V1\ChangeRoleRequest;
 use App\Http\Requests\Api\V1\GroupMemberActionRequest;
 use App\Http\Requests\Api\V1\GroupMemberInviteRequest;
+use App\Http\Resources\Api\V1\UserResource;
 use App\Models\Group;
 use App\Models\User;
 use App\Services\GroupMemberService;
@@ -67,5 +68,24 @@ class GroupMemberController extends Controller
       } catch (\Exception $e) {
          return \responder::error($e->getMessage());
       }
+   }
+
+    public function leaveGroup(Group $group)
+   {
+       $this->groupMemberService->leaveGroup($group);
+       return \responder::success([__('Successfully left the group')]);
+   }
+
+   public function removeMember(Group $group, User $user)
+   {
+       $this->groupMemberService->removeMember($group, $user);
+       return \responder::success([ __('Member removed successfully')]);
+   }
+
+   public function changeRole(ChangeRoleRequest $request, Group $group)
+   {
+       $newRole = $request->role;
+       $this->groupMemberService->changeRole($group, $request->validated());
+       return \responder::success([ __('Role changed successfully')]);
    }
 }

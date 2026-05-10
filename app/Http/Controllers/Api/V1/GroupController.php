@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\GroupRole;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\ChangeRoleRequest;
+use App\Http\Requests\Api\V1\GroupRequest;
 use App\Http\Resources\Api\V1\GroupResource;
 use App\Services\GroupService;
-use App\Http\Requests\Api\V1\GroupRequest;
-use App\Enums\GroupRole;
+use Illuminate\Http\Request;
 
 class GroupController extends Controller
 {
@@ -37,4 +39,8 @@ class GroupController extends Controller
        $groups = $this->groupService->getUserGroups();
        return \responder::success(GroupResource::collection($groups));
    }
+
+  
+
+
 }

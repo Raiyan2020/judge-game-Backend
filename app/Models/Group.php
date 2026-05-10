@@ -6,13 +6,13 @@ use App\Http\Traits\ImageOperations;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['name', 'image', 'user_id','description'])]
+#[Fillable(['name', 'image', 'user_id', 'description'])]
 
 class Group extends Model
 {
     use ImageOperations;
 
-  # Relations
+    # Relations
     public function users()
     {
         return $this->belongsToMany(User::class)
@@ -29,6 +29,14 @@ class Group extends Model
     {
         return $this->hasOne(Chat::class);
     }
+
+    public function legalCases()
+    {
+        return $this->hasMany(LegalCase::class);
+    }
+
+    public function permissions()
+    {
+        return $this->hasMany(GroupRolePermission::class);
+    }
 }
-
-

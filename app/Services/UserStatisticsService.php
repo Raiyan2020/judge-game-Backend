@@ -14,6 +14,7 @@ class UserStatisticsService
 
     public function getForUserGroup(User $user, Group $group): array
     {
+        $user = $user->load('points'); 
         $groupUser = $group->users()->where('user_id', $user->id)->first();
 
         if (! $groupUser) {
@@ -31,8 +32,8 @@ class UserStatisticsService
                 'image' => $user->image,
                 'title' => $groupUser->pivot->title,
                 'role' => $groupUser->pivot->role,
-                'is_online' => $user->isOnline(),
-                'points' =>0, #TODO: calculate points based on user activity
+                'is_online' => $user->status === 'online',
+                'points' => $user->points->total_points ?? 0,
             ],
             'statistics' => $statistics,
         ];

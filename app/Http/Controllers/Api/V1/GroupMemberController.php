@@ -4,12 +4,12 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\ChangeRoleRequest;
-use App\Http\Requests\Api\V1\GroupMemberActionRequest;
 use App\Http\Requests\Api\V1\GroupMemberInviteRequest;
 use App\Http\Resources\Api\V1\UserResource;
 use App\Models\Group;
 use App\Models\User;
 use App\Services\GroupMemberService;
+use Illuminate\Http\Request;
 
 class GroupMemberController extends Controller
 {
@@ -87,5 +87,11 @@ class GroupMemberController extends Controller
        $newRole = $request->role;
        $this->groupMemberService->changeRole($group, $request->validated());
        return \responder::success([ __('Role changed successfully')]);
+   }
+
+   public function getMemberByRole(Group $group, Request $request)
+   {
+       $members = $this->groupMemberService->getMembersByRole($group, $request->role,$request->except_user_id);
+       return \responder::success(UserResource::collection($members));
    }
 }

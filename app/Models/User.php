@@ -57,4 +57,29 @@ class User extends Authenticatable
     {
         return $this->hasMany(GroupUserPermission::class);
     }
+
+    public function points()
+    {
+        return $this->hasOne(Point::class);
+    }
+
+    public function globalRank(): int
+    {
+        $myPoints = $this->points?->total_points ?? 0;
+
+        return Point::where('total_points', '>', $myPoints)->count() + 1;
+    }
+
+    public function localRank(?int $countryCode = null): int
+    {
+        $countryCode ??= $this->country_code;
+
+        $myPoints = $this->points?->total_points ?? 0;
+
+        return Point::whereHas('user', function ($q) use ($countryCode) {
+            $q->where('country_code', $countryCode);
+        })
+            ->where('total_points', '>', $myPoints)
+            ->count() + 1;
+    }
 }

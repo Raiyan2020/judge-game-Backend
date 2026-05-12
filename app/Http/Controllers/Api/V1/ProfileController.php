@@ -23,7 +23,7 @@ class ProfileController extends Controller
     {
         $user = auth()->user();
 
-        return \responder::success(new UserResource($user->load('activeSubscription.package')));
+        return \responder::success(new UserResource($user->load('activeSubscription.package', 'points')));
     }
 
     /**
@@ -37,7 +37,7 @@ class ProfileController extends Controller
         $user = $request->user();
         $updated = $this->userService->updateProfile($user, $request->validated());
 
-        return \responder::success(new UserResource($updated->load('activeSubscription.package')));
+        return \responder::success(new UserResource($updated->load('activeSubscription.package', 'points')));
     }
 
     /**
@@ -51,6 +51,6 @@ class ProfileController extends Controller
         $user = $request->user();
         $updated = $this->userService->updateSettings($user, $request->validated());
 
-        return \responder::success(new UserResource($updated->load('activeSubscription.package')));
+        return \responder::success(new UserResource($updated->load('activeSubscription.package', 'points')));
     }
 }

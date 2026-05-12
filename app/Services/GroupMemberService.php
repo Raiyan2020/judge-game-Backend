@@ -194,4 +194,9 @@ class GroupMemberService
             ]);
         }
     }
+
+    public function getMembersByRole(Group $group, $role ,$exceptUserId = null)
+    {
+        return $this->repo->getMembersByRole($group, $role, $exceptUserId);
+    }    
 }

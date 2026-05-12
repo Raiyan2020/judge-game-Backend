@@ -59,4 +59,13 @@ class GroupRepository extends BaseRepository
     {
         $group->users()->detach($user->id);
     }
+
+    public function getMembersByRole(Group $group, $role, $exceptUserId = null)
+    {
+        $query = $group->users()->wherePivot('role', $role)->wherePivot('status', 'accepted');
+        if ($exceptUserId) {
+            $query->where('user_id', '!=', $exceptUserId);
+        }
+        return $query->get();
+    }    
 }

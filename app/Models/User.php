@@ -103,4 +103,9 @@ class User extends Authenticatable
             'legal_case_id'
         )->wherePivot('role', CaseRole::DEFENDANT->value);
     }
+
+    public function country()
+    {
+        return $this->belongsTo(Country::class);
+    }
 }

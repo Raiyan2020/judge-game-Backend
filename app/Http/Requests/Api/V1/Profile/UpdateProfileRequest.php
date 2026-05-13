@@ -23,6 +23,7 @@ class UpdateProfileRequest extends FormRequest
             })],
             'status' => ['sometimes', 'string', new Enum(\App\Enums\UserStatus::class)],
             'image' => 'sometimes|image|max:2048',
+            'country_id' => 'sometimes|exists:countries,id',
         ];
     }
 }

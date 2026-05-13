@@ -15,6 +15,7 @@ return new class extends Migration
         Schema::create('point_transactions', function (Blueprint $table) {
             $table->id();
             $table->foreignIdFor(User::class)->constrained()->cascadeOnDelete();
+            $table->string('role')->nullable();
             $table->integer('points');
             $table->text('notes')->nullable();
             $table->timestamps();

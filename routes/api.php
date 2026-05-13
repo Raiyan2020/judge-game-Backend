@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\PackageSubscriptionController;
 use App\Http\Controllers\Api\V1\PermissionController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\SettingController;
+use App\Http\Controllers\Api\V1\UserRankController;
 use App\Http\Controllers\Api\V1\UserStatisticsController;
 use Illuminate\Support\Facades\Route;
 
@@ -93,4 +94,5 @@ Route::group(['middleware' => 'setLocale'], function () {
     Route::get('contact-settings', [SettingController::class, 'contactSettings']);
     Route::get('setting-pages', [SettingController::class, 'getSettingsPages']);
     Route::get('setting-laws', [SettingController::class, 'getSettingsLaws']);
+    Route::get('users-ranking', [UserRankController::class, 'index']);
 });

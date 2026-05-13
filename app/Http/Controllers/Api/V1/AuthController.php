@@ -44,6 +44,7 @@ class AuthController extends Controller
   public function verifyCode(CheckCodeRequest $request)
   {
     $user = $this->authService->checkCode($request->validated());
+     $this->legalCaseWinLossCounts($user);
     if ($user)  return \responder::success(new UserResource($user->load('activeSubscription.package','points')));
 
     return \responder::error(__('Error verification code try again'));
@@ -61,6 +62,33 @@ class AuthController extends Controller
 
     return \responder::success(__('logout successfully'));
   }
+
+    private function legalCaseWinLossCounts($user)
+    {
+        return $user->loadCount([
+            'plaintiffCases',
+
+            'defendantCases',
+
+            'plaintiffCases as plaintiff_wins_count' => function ($q) use ($user) {
+                $q->where('winner_id', $user->id);
+            },
+
+            'plaintiffCases as plaintiff_losses_count' => function ($q) use ($user) {
+                $q->whereNot('winner_id', $user->id)
+                    ->whereNotNull('winner_id');
+            },
+
+            'defendantCases as defendant_wins_count' => function ($q) use ($user) {
+                $q->where('winner_id', $user->id);
+            },
+
+            'defendantCases as defendant_losses_count' => function ($q) use ($user) {
+                $q->whereNot('winner_id', $user->id)
+                    ->whereNotNull('winner_id');
+            },
+        ]);
+    }
 
 
 }

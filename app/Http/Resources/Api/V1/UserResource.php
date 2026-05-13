@@ -37,6 +37,12 @@ class UserResource extends JsonResource
             'points' => $this->relationLoaded('points') ? $this->points?->total_points ?? 0 : null  ,
             'global_rank' => $this->relationLoaded('points') ? $this->globalRank() : null,
             'local_rank' => $this->relationLoaded('points') ? $this->localRank() : null,
+            'plaintiff_cases_count' => $this->plaintiff_cases_count ,
+            'defendant_cases_count' => $this->defendant_cases_count ,
+            'plaintiff_wins_count' => $this->plaintiff_wins_count ,
+            'plaintiff_losses_count' => $this->plaintiff_losses_count ,
+            'defendant_wins_count' => $this->defendant_wins_count,
+            'defendant_losses_count' => $this->defendant_losses_count
 
         ];
     }

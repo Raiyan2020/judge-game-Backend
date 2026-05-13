@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\CaseRole;
 use App\Http\Traits\AvatarOperations;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -81,5 +82,25 @@ class User extends Authenticatable
         })
             ->where('total_points', '>', $myPoints)
             ->count() + 1;
+    }
+
+    public function plaintiffCases()
+    {
+        return $this->belongsToMany(
+            LegalCase::class,
+            'legal_case_parties',
+            'user_id',
+            'legal_case_id'
+        )->wherePivot('role', CaseRole::PLAINTIFF->value);
+    }
+
+    public function defendantCases()
+    {
+        return $this->belongsToMany(
+            LegalCase::class,
+            'legal_case_parties',
+            'user_id',
+            'legal_case_id'
+        )->wherePivot('role', CaseRole::DEFENDANT->value);
     }
 }

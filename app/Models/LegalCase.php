@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
-#[Fillable(['title', 'group_id', 'description', 'user_id', 'status', 'damages', 'final_judgment', 'judged_by', 'judged_at'])]
+#[Fillable(['title', 'group_id', 'description', 'user_id', 'status', 'damages','winner_id'])]
 class LegalCase extends Model implements HasMedia
 {
     use InteractsWithMedia;

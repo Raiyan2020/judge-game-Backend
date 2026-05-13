@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api\V1\Profile;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 
 class UpdateProfileRequest extends FormRequest
@@ -17,7 +18,9 @@ class UpdateProfileRequest extends FormRequest
         return [
             'name' => 'sometimes|string|max:255',
             'country_code' => 'sometimes|numeric',
-            'phone' => 'sometimes|string|max:50',
+            'phone' => ['required', Rule::unique('users')->where(function ($query) {
+                $query->where('country_code', $this->country_code)->where('phone', $this->phone)->where('id', '!=', $this->user()->id);
+            })],
             'status' => ['sometimes', 'string', new Enum(\App\Enums\UserStatus::class)],
             'image' => 'sometimes|image|max:2048',
         ];

@@ -59,7 +59,7 @@ class LegalCaseJudgmentService
             $this->createCaseNews($legalCase, $judgment);
 
             if (in_array($judgment->judgment_type, [LegalCaseJudgmentType::DISMISSED->value, LegalCaseJudgmentType::ACQUITTAL->value])) {
-                $legalCase->update(['status' => LegalCaseStatus::CLOSED->value]);
+                $legalCase->update(['status' => LegalCaseStatus::CLOSED->value , 'winner_id' => $legalCase->defendant?->user_id]);
             } else {
                 $legalCase->update(['status' => LegalCaseStatus::ONGOING->value]);
             }
@@ -105,7 +105,7 @@ class LegalCaseJudgmentService
                 'is_final' => true,
             ]);
 
-            $legalCase->update(['status' => LegalCaseStatus::EXECUTION->value]);
+            $legalCase->update(['status' => LegalCaseStatus::EXECUTION->value , 'winner_id' => $data['judgment_type'] === LegalCaseJudgmentType::CONVICTION->value ? $legalCase->plaintiff?->user_id : $legalCase->defendant?->user_id]);
 
             $this->createFinalJudgmentNews($legalCase, $judgment);
 
@@ -282,7 +282,7 @@ class LegalCaseJudgmentService
                 ]);
             }
             $this->ensureUserIsDefendantLawyer($legalCase);
-            $legalCase->update(['status' => LegalCaseStatus::CLOSED->value]);
+            $legalCase->update(['status' => LegalCaseStatus::CLOSED->value , 'winner_id' =>$legalCase->plaintiff?->user_id]);
             $judgment = $legalCase->firstInstanceJudgment;
             if ($judgment) {
                 $judgment->update(['is_final' => true]);

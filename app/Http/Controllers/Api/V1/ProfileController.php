@@ -22,7 +22,7 @@ class ProfileController extends Controller
     public function show(Request $request)
     {
         $user = auth()->user();
-
+        $this->legalCaseWinLossCounts($user);
         return \responder::success(new UserResource($user->load('activeSubscription.package', 'points')));
     }
 
@@ -35,7 +35,9 @@ class ProfileController extends Controller
     public function update(UpdateProfileRequest $request)
     {
         $user = $request->user();
+
         $updated = $this->userService->updateProfile($user, $request->validated());
+        $this->legalCaseWinLossCounts($updated);
 
         return \responder::success(new UserResource($updated->load('activeSubscription.package', 'points')));
     }
@@ -51,6 +53,35 @@ class ProfileController extends Controller
         $user = $request->user();
         $updated = $this->userService->updateSettings($user, $request->validated());
 
+        $this->legalCaseWinLossCounts($updated);
+
         return \responder::success(new UserResource($updated->load('activeSubscription.package', 'points')));
+    }
+
+    private function legalCaseWinLossCounts($user)
+    {
+        return $user->loadCount([
+            'plaintiffCases',
+
+            'defendantCases',
+
+            'plaintiffCases as plaintiff_wins_count' => function ($q) use ($user) {
+                $q->where('winner_id', $user->id);
+            },
+
+            'plaintiffCases as plaintiff_losses_count' => function ($q) use ($user) {
+                $q->whereNot('winner_id', $user->id)
+                    ->whereNotNull('winner_id');
+            },
+
+            'defendantCases as defendant_wins_count' => function ($q) use ($user) {
+                $q->where('winner_id', $user->id);
+            },
+
+            'defendantCases as defendant_losses_count' => function ($q) use ($user) {
+                $q->whereNot('winner_id', $user->id)
+                    ->whereNotNull('winner_id');
+            },
+        ]);
     }
 }

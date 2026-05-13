@@ -23,10 +23,7 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->string('status')->default(LegalCaseStatus::NEW->value);
             $table->text('damages')->nullable();
-            $table->text('final_judgment')->nullable();          
-            $table->foreignIdFor(User::class, 'judged_by')->nullable()->constrained('users')->nullOnDelete(); 
-            $table->timestamp('judged_at')->nullable();          
-            $table->timestamps();
+             $table->timestamps();
         });
     }
 

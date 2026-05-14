@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AdsController;
+use App\Http\Controllers\Api\V1\AgoraController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BannerController;
 use App\Http\Controllers\Api\V1\ContactController;
@@ -73,6 +74,7 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::post('coupons', [CouponController::class, 'store']);
         Route::get('permissions', [PermissionController::class, 'index']);
         Route::post('permissions', [PermissionController::class, 'togglePermission']);
+        Route::get('agora/token', [AgoraController::class, 'generateToken']);
         Route::group(['middleware' => 'checkActiveSubscription'], function () {
             Route::post('legal-cases', [LegalCaseController::class, 'store']);
             Route::post('assign-lawyer', [LegalCaseController::class, 'assignDefendantLawyer']);

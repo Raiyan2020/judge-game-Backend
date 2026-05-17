@@ -139,5 +139,7 @@
     "case":"القضية",
     "by":"بواسطة",
     "You do not have an active subscription. Please subscribe to a package first": "ليس لديك اشتراك نشط. يرجى الاشتراك في باقة أولاً",
-    "Permission updated successfully":"تم تحديث الصلاحية بنجاح"
+    "Permission updated successfully":"تم تحديث الصلاحية بنجاح",
+    "pribate":"خاص",
+    "public":"عام"
 }

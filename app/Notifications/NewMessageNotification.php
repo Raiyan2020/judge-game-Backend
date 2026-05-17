@@ -19,7 +19,7 @@ class NewMessageNotification extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return ['database', 'broadcast']; // You can add 'fcm' or other channels
+        return ['database', 'broadcast']; 
     }
 
     public function toArray(object $notifiable): array

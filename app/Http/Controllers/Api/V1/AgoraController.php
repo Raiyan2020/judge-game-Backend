@@ -3,35 +3,18 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use TaylanUnutmaz\AgoraTokenBuilder\RtcTokenBuilder;
+use App\Models\Room;
+use App\Services\AgoraService;
 
 class AgoraController extends Controller
 {
-
-    public function generateToken()
+    public function __construct(protected AgoraService $agoraSerives)
     {
-        $appId = env('AGORA_APP_ID');
-        $appCertificate = env('AGORA_APP_CERTIFICATE');
-      $channelName = 'room_1';
+    }
 
-$uid = auth()->id();
-      $role = RtcTokenBuilder::RolePublisher;
-        $expireTimeInSeconds = 3600;
-        $currentTimestamp = (new \DateTime())->getTimestamp();
-        $privilegeExpiredTs = $currentTimestamp + $expireTimeInSeconds;
-
-$token = RtcTokenBuilder::buildTokenWithUid(
-    $appId,
-    $appCertificate,
-    $channelName,
-    $uid,
-    $role,
-    $privilegeExpiredTs
-);
-       return \responder::success([
-    'token' => $token,
-    'channel' => $channelName,
-    'uid' => $uid,
-]);
+    public function generateToken(Room $room)
+    {
+       $tokenData = $this->agoraSerives->generateToken($room);
+       return \responder::success($tokenData);
     }
 }

@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\PackageController;
 use App\Http\Controllers\Api\V1\PackageSubscriptionController;
 use App\Http\Controllers\Api\V1\PermissionController;
 use App\Http\Controllers\Api\V1\ProfileController;
+use App\Http\Controllers\Api\V1\RoomController;
 use App\Http\Controllers\Api\V1\SettingController;
 use App\Http\Controllers\Api\V1\UserRankController;
 use App\Http\Controllers\Api\V1\UserStatisticsController;
@@ -74,7 +75,13 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::post('coupons', [CouponController::class, 'store']);
         Route::get('permissions', [PermissionController::class, 'index']);
         Route::post('permissions', [PermissionController::class, 'togglePermission']);
-        Route::get('agora/token', [AgoraController::class, 'generateToken']);
+        Route::get('rooms/{room}/token', [AgoraController::class, 'generateToken']);
+        Route::get('rooms', [RoomController::class, 'index']);
+        Route::post('rooms', [RoomController::class, 'store']);
+        Route::get('rooms/{room}', [RoomController::class, 'show']);
+        Route::post('rooms/{room}/join', [RoomController::class, 'join']);
+        Route::post('rooms/{room}/leave', [RoomController::class, 'leave']);
+        Route::post('rooms/{room}/toggle-mute', [RoomController::class, 'toggleMute']);
         Route::group(['middleware' => 'checkActiveSubscription'], function () {
             Route::post('legal-cases', [LegalCaseController::class, 'store']);
             Route::post('assign-lawyer', [LegalCaseController::class, 'assignDefendantLawyer']);

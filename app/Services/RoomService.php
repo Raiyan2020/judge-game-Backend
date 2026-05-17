@@ -119,6 +119,10 @@ public function join($room, $validatedData)
 }
     public function leave($room)
     {
+        if ($room->user_id === auth()->id()) {
+            $room->delete();
+            return;
+        }
         $room->users()->detach(auth()->id());
     }
 

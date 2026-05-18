@@ -16,13 +16,10 @@ return Application::configure(basePath: dirname(__DIR__))
         channels: __DIR__.'/../routes/channels.php',
         health: '/up',
           then: function () {
-            //    Route::middleware('web')
-            //     ->prefix('dashboard')
-            //     ->name('admin.')
-            //     ->group(base_path('routes/admin.php'));
-
-             
-
+               Route::middleware('web')
+                ->prefix('dashboard')
+                ->name('admin.')
+                ->group(base_path('routes/admin.php'));
         }
     )
     ->withMiddleware(function (Middleware $middleware) {
@@ -36,10 +33,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
         ]);
     })
-    ->withSchedule(function (Schedule $schedule) {
-        $schedule->job(new \App\Jobs\CloseExpiredExecutionCases)->daily();
-        $schedule->job(new \App\Jobs\ProcessExpiredPolls)->hourly();
-    })
+    // ->withSchedule(function (Schedule $schedule) {
+    //     $schedule->job(new \App\Jobs\CloseExpiredExecutionCases)->daily();
+    //     $schedule->job(new \App\Jobs\ProcessExpiredPolls)->hourly();
+    // })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (ValidationException $e, Request $request) {
             if ($request->expectsJson()) {

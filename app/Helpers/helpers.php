@@ -91,4 +91,13 @@ function statusChange()
     alert()->success(__('Status changed successfully !'));
 }
 
+function getClass($status)
+{
+    return $status == 1 ? 'success' : 'danger';
+}
+
+function getStatusName($status)
+{
+    return $status == 1 ? __('active') : __('inactive');
+}
 

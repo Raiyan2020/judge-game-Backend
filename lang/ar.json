@@ -141,5 +141,8 @@
     "You do not have an active subscription. Please subscribe to a package first": "ليس لديك اشتراك نشط. يرجى الاشتراك في باقة أولاً",
     "Permission updated successfully":"تم تحديث الصلاحية بنجاح",
     "pribate":"خاص",
-    "public":"عام"
+    "public":"عام",
+    "login":"تسجيل الدخول",
+    "welcome to judge":"مرحبًا بك في judge",
+    "add new":"إضافة جديد"
 }

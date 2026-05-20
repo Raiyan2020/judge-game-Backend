@@ -47,5 +47,10 @@ class SettingRepository extends BaseRepository
         return true;
     }
 
+    public function getPagesSetting($page)
+    {
+         return $this->model->wherePage($page)->get();
+    }
+
 
 }

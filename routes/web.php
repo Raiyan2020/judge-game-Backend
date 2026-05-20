@@ -11,4 +11,4 @@ Route::get('/', function () {
 
 Route::get('success', [\App\Http\Controllers\Payment\WebhookController::class, 'success'])->name('payment.success');
 Route::get('error', [\App\Http\Controllers\Payment\WebhookController::class, 'error'])->name('payment.error');
-//Route::get('/change-language/{lang}',[\App\Http\Controllers\LangController::class,'changeLang'])->name('change-language');
+Route::get('/change-language/{lang}',[\App\Http\Controllers\LangController::class,'changeLang'])->name('change-language');

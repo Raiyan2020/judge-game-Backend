@@ -43,5 +43,10 @@ class SettingService {
        return  $this->repo->store($data);
     }
 
+    public function getPagesSetting($page)
+    {
+        return $this->repo->getPagesSetting($page);
+    }
+
 
 }

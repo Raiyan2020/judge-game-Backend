@@ -26,29 +26,37 @@
                 <a href="{{ route('admin.admins.index') }}"><i class="feather icon-user-check">
                     </i><span class="menu-title" data-i18n="Starter kit">{{ __('admins') }}</span></a>
             </li>
-             <li class=" nav-item {{ request()->is('dashboard/users*') ? 'active' : '' }}">
+            <li class=" nav-item {{ request()->is('dashboard/users*') ? 'active' : '' }}">
                 <a href="{{ route('admin.users.index') }}"><i class="feather icon-users">
                     </i><span class="menu-title" data-i18n="Starter kit">{{ __('users') }}</span></a>
             </li>
-           
-             <li class="nav-item {{ request()->is('dashboard/banners*') ? 'active' : '' }}">
+
+            <li class="nav-item {{ request()->is('dashboard/banners*') ? 'active' : '' }}">
                 <a href="{{ route('admin.banners.index') }}"><i class="feather icon-image">
                     </i><span class="menu-title" data-i18n="Starter kit">{{ __('banners') }}</span></a>
             </li>
-             <li class=" nav-item {{ request()->is('dashboard/countries*') ? 'active' : '' }}">
+            <li class=" nav-item {{ request()->is('dashboard/countries*') ? 'active' : '' }}">
                 <a href="{{ route('admin.countries.index') }}"><i class="feather icon-map-pin">
                     </i><span class="menu-title" data-i18n="Starter kit">{{ __('countries') }}</span></a>
 
             </li>
-            
 
-           
+            <li class=" nav-item {{ request()->is('dashboard/tips*') ? 'active' : '' }}">
+                <a href="{{ route('admin.tips.index') }}"><i class="feather icon-info"></i><span class="menu-title"
+                        data-i18n="Starter kit"> {{ __('tips') }} </span></a>
+            </li>
 
-              <li class=" nav-item {{ request()->is('dashboard/settings*') ? 'active' : '' }}">
+            <li class=" nav-item {{ request()->is('dashboard/contacts*') ? 'active' : '' }}">
+                <a href="{{ route('admin.contacts.index') }}"><i class="feather icon-mail"></i><span class="menu-title"
+                        data-i18n="Starter kit"> {{ __('contact us') }} </span></a>
+
+            </li>
+
+            <li class=" nav-item {{ request()->is('dashboard/settings*') ? 'active' : '' }}">
                 <a href="{{ route('admin.settings.index') }}"><i class="feather icon-map"></i><span class="menu-title"
                         data-i18n="Starter kit"> {{ __('settings') }} </span></a>
-            </li>   
-          
+            </li>
+
             <form method="POST" action="{{ route('admin.logout') }}" id="logout-form">
                 @csrf
                 @method('POST')

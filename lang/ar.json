@@ -144,5 +144,9 @@
     "public":"عام",
     "login":"تسجيل الدخول",
     "welcome to judge":"مرحبًا بك في judge",
-    "add new":"إضافة جديد"
+    "add new":"إضافة جديد",
+    "tips":"نصائح",
+    "display speed":"سرعة العرض",
+    "last updates":"آخر التحديثات",
+    "version":"الإصدار"
 }

@@ -46,6 +46,21 @@
                         data-i18n="Starter kit"> {{ __('tips') }} </span></a>
             </li>
 
+            <li class=" nav-item {{ request()->is('dashboard/last-updates*') ? 'active' : '' }}">
+                <a href="{{ route('admin.last-updates.index') }}"><i class="feather icon-clock"></i><span
+                        class="menu-title" data-i18n="Starter kit"> {{ __('last updates') }} </span></a>
+            </li>
+
+            <li class=" nav-item {{ request()->is('dashboard/coupons*') ? 'active' : '' }}">
+                <a href="{{ route('admin.coupons.index') }}"><i class="feather icon-tag"></i><span class="menu-title"
+                        data-i18n="Starter kit"> {{ __('coupons') }} </span></a>
+            </li>
+
+            <li class=" nav-item {{ request()->is('dashboard/packages*') ? 'active' : '' }}">
+                <a href="{{ route('admin.packages.index') }}"><i class="feather icon-package"></i><span
+                        class="menu-title" data-i18n="Starter kit"> {{ __('packages') }} </span></a>
+            </li>
+
             <li class=" nav-item {{ request()->is('dashboard/contacts*') ? 'active' : '' }}">
                 <a href="{{ route('admin.contacts.index') }}"><i class="feather icon-mail"></i><span class="menu-title"
                         data-i18n="Starter kit"> {{ __('contact us') }} </span></a>

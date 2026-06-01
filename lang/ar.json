@@ -148,5 +148,10 @@
     "tips":"نصائح",
     "display speed":"سرعة العرض",
     "last updates":"آخر التحديثات",
-    "version":"الإصدار"
+    "version":"الإصدار",
+    "display speed with seconds":"سرعة العرض بالثواني",
+    "coupons":"كوبونات",
+    "packages":"الباقات",
+     "duration in days":"المدة بالأيام",
+     "most sale":"الأكثر مبيعًا"
 }

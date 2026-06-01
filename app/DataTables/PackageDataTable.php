@@ -2,15 +2,14 @@
 
 namespace App\DataTables;
 
-use App\Models\LastUpdate;
-use App\Models\Tip;
+use App\Models\Package;
 use Illuminate\Database\Eloquent\Builder as QueryBuilder;
 use Yajra\DataTables\EloquentDataTable;
 use Yajra\DataTables\Html\Builder as HtmlBuilder;
 use Yajra\DataTables\Html\Column;
 use Yajra\DataTables\Services\DataTable;
 
-class LastUpdateDataTable extends DataTable
+class PackageDataTable extends DataTable
 {
     /**
      * Build the DataTable class.
@@ -20,26 +19,27 @@ class LastUpdateDataTable extends DataTable
     public function dataTable(QueryBuilder $query): EloquentDataTable
     {
         return (new EloquentDataTable($query))
-        ->addColumn('action', 'dashboard.last-updates.action')
-       
-         ->addColumn('title', function ($lastUpdate) {
-            return $lastUpdate->title;
-         })
-        ->addColumn('status', function ($lastUpdate) {
-            return view('dashboard.last-updates.status', ['lastUpdate' => $lastUpdate]);
-        })
-        ->addColumn('image', function ($lastUpdate) {
-            return " <img src='{$lastUpdate->image}'  width='75' height='75'>";
-        })
-        ->addIndexColumn()
-       ->rawColumns(['image','action','title','status'])
+            ->addColumn('action', 'dashboard.packages.action')
+            ->filterColumn('name', function ($query, $keyword) {
+                $query->whereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(name, '$.en'))) like LOWER(?)", ["%$keyword%"])
+                    ->orWhereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(name, '$.ar'))) like LOWER(?)", ["%$keyword%"]);
+            })
+            ->addColumn('name', function ($package) {
+                return $package->name;
+            })
+           
+            ->addColumn('status', function ($package) {
+                return view('dashboard.packages.status', ['package' => $package]);
+            })
+            ->addIndexColumn()
+            ->rawColumns(['name', 'status', 'action'])
             ->setRowId('id');
     }
 
     /**
      * Get the query source of dataTable.
      */
-    public function query(LastUpdate $model): QueryBuilder
+    public function query(Package $model): QueryBuilder
     {
         return $model->newQuery()->latest();
     }
@@ -50,14 +50,18 @@ class LastUpdateDataTable extends DataTable
     public function html(): HtmlBuilder
     {
         return $this->builder()
-            ->setTableId('last-update-table')
+            ->setTableId('package-table')
             ->columns($this->getColumns())
             ->minifiedAjax()
             ->dom('Bfrtip')
             ->orderBy(0)
             ->responsive(true)
             ->selectStyleSingle()
+            ->responsive()
             ->buttons([])
+            ->parameters([
+                'searching' => true,
+            ])
             ->language([
                 'lengthMenu' => '_MENU_',
                 'sProcessing' => __('Loading...'),
@@ -87,9 +91,9 @@ class LastUpdateDataTable extends DataTable
     {
         return [
             Column::computed('DT_RowIndex')->title('#'),
-            Column::computed('title')->title(__('title')),
-            Column::computed('version')->title(__('version')),
-            Column::computed('image')->title(__('image')),
+            Column::computed('name')->title(__('name'))->searchable(),
+            Column::make('price')->title(__('price')),
+            Column::make('duration_days')->title(__('duration in days')),
             Column::computed('status')->title(__('status')),
             Column::computed('action')->title(__('actions')),
         ];
@@ -100,6 +104,6 @@ class LastUpdateDataTable extends DataTable
      */
     protected function filename(): string
     {
-        return 'LastUpdate_' . date('YmdHis');
+        return 'Package_' . date('YmdHis');
     }
 }

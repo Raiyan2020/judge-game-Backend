@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 
-#[Fillable(['code', 'discount', 'start_at', 'end_at'])]
+#[Fillable(['code', 'discount', 'start_at', 'end_at','is_active'])]
 
 class Coupon extends Model
 {

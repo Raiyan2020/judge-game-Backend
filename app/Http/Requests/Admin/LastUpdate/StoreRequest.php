@@ -22,10 +22,13 @@ class StoreRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'title' => 'required|array',
+            'title.ar'=>'required|string|min:1|max:255',
+            'title.en'=>'required|string|min:1|max:255',
             'description' => 'required|array',
             'description.ar'=>'required|string|min:1|max:255',
             'description.en'=>'required|string|min:1|max:255',
-            'version' => 'required|integer|min:0',
+            'version' => 'required|numeric|min:0',
             'display_speed' => 'required|numeric|min:0',
             'image'=>[request()->isMethod('post') ? 'required' : 'sometimes','image'],
         ];

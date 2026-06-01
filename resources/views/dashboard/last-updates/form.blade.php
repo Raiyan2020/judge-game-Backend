@@ -4,7 +4,7 @@
         :item="isset($lastUpdate) ? $lastUpdate : null"></x-translatable-textarea>
     <x-number title="{{ __('version') }}" name="version" size="6"
         value="{{ old('version', $lastUpdate->version ?? '') }}"></x-number>
-    <x-number title="{{ __('display speed') }}" name="display_speed" size="6"
+    <x-number title="{{ __('display speed with seconds') }}" name="display_speed" size="6"
         value="{{ old('display_speed', $lastUpdate->display_speed ?? '') }}"></x-number>
     <div class="col-12">
         <div class="form-group">

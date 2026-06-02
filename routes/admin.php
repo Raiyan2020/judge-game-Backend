@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\BannerController;
 use App\Http\Controllers\Admin\ContactController;
 use App\Http\Controllers\Admin\CountryController;
 use App\Http\Controllers\Admin\CouponController;
+use App\Http\Controllers\Admin\GroupController;
 use App\Http\Controllers\Admin\HomeController;
 use App\Http\Controllers\Admin\LastUpdateController;
 use App\Http\Controllers\Admin\LoginController;
@@ -36,6 +37,7 @@ Route::group(['middleware' => ['auth:admin', 'localization']], function () {
         'packages' =>PackageController::class,
     ]);
     Route::get('subscriptions', [PackageSubscriptionController::class,'index'])->name('subscriptions.index');
+    Route::get('groups', [GroupController::class,'index'])->name('groups.index');
     Route::get('contacts', [ContactController::class,'index'])->name('contacts.index');
     Route::delete('contacts/{contact}', [ContactController::class,'destroy'])->name('contacts.destroy');
     Route::PUT('countries/change-status/{country}', [CountryController::class, 'changeStatus'])->name('countries.changeStatus');

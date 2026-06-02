@@ -158,6 +158,10 @@
     "packagename":"اسم الباقة",
      "username":"اسم المستخدم",
      "starts at":"تبدأ في",
-     "ends at":"تنتهي في"
+     "ends at":"تنتهي في",
+     "groups":"المجموعات",
+     "owner":"المالك",
+     "members count":"عدد الأعضاء",
+     "legal cases count":"عدد القضايا القانونية"
    
 }

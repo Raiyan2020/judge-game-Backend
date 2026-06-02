@@ -152,6 +152,12 @@
     "display speed with seconds":"سرعة العرض بالثواني",
     "coupons":"كوبونات",
     "packages":"الباقات",
-     "duration in days":"المدة بالأيام",
-     "most sale":"الأكثر مبيعًا"
+    "duration in days":"المدة بالأيام",
+    "most sale":"الأكثر مبيعًا",
+    "subscriptions":"الاشتراكات",
+    "packagename":"اسم الباقة",
+     "username":"اسم المستخدم",
+     "starts at":"تبدأ في",
+     "ends at":"تنتهي في"
+   
 }

@@ -60,6 +60,10 @@
                 <a href="{{ route('admin.packages.index') }}"><i class="feather icon-package"></i><span
                         class="menu-title" data-i18n="Starter kit"> {{ __('packages') }} </span></a>
             </li>
+            <li class=" nav-item {{ request()->is('dashboard/subscriptions*') ? 'active' : '' }}">
+                <a href="{{ route('admin.subscriptions.index') }}"><i class="feather icon-check-circle"></i><span
+                        class="menu-title" data-i18n="Starter kit"> {{ __('subscriptions') }} </span></a>
+            </li>
 
             <li class=" nav-item {{ request()->is('dashboard/contacts*') ? 'active' : '' }}">
                 <a href="{{ route('admin.contacts.index') }}"><i class="feather icon-mail"></i><span class="menu-title"

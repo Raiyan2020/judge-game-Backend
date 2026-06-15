@@ -13,9 +13,9 @@ return new class extends Migration
     {
         Schema::create('permissions', function (Blueprint $table) {
             $table->id();
-              $table->string('group'); // group_settings
-    $table->text('name'); // تغيير صورة المجموعة
-    $table->string('key')->unique(); // change_group_image
+            $table->string('group');
+            $table->text('name'); 
+            $table->string('key')->unique(); 
             $table->timestamps();
         });
     }

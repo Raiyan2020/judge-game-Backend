@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 
 class GroupLawService
 {
-    public function __construct(protected GroupLawRepository $repo, protected MessageService $messageService) {}
+    public function __construct(protected GroupLawRepository $repo, protected MessageService $messageService , protected GroupPermissionService $permissionService) {}
 
     public function index($groupId)
     {
@@ -28,6 +28,14 @@ class GroupLawService
                 'reason' => $data['reason'] ?? null,
             ]);
         }
+        if (!$this->permissionService->hasPermission(
+            auth()->id(),
+            Group::findOrFail($data['group_id']),
+            'add_laws'
+        )) {
+            throw ValidationException::withMessages(['You are not authorized to create a law change request.']);
+        }
+
 
         return $this->createPoll($data, ChatPollType::CREATE_LAW->value);
     }

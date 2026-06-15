@@ -43,7 +43,7 @@ Route::group(['middleware' => 'setLocale'], function () {
             Route::post('logout', [AuthController::class, 'logout']);
         });
 
-        Route::apiResource('groups', GroupController::class)->only(['index', 'store']);
+        Route::apiResource('groups', GroupController::class)->only(['index', 'store', 'update']);
         Route::get('my-groups', [GroupController::class, 'myGroups']);
         Route::post('groups/{group}/leave', [GroupController::class, 'leaveGroup']);
         Route::delete('groups/{group}/members/{userId}', [GroupController::class, 'removeMember']);

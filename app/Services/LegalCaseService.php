@@ -14,20 +14,20 @@ use Illuminate\Validation\ValidationException;
 
 class LegalCaseService
 {
-    public function __construct(protected LegalCaseRepository $repo, protected GroupRepository $groupRepo) {}
+    public function __construct(protected LegalCaseRepository $repo, protected GroupRepository $groupRepo, protected GroupPermissionService $groupPermissionService) {}
 
     public function index($filters, $groupId)
-     {
-         $filters['group_id'] = $groupId;
-         return $this->repo->index($filters);
-     } 
-   
+    {
+        $filters['group_id'] = $groupId;
+        return $this->repo->index($filters);
+    }
+
 
     public function create($request)
     {
         try {
             DB::beginTransaction();
-           
+
             $userId = auth()->id();
             $participants = $request['participants'];
             $request['user_id'] = $userId;
@@ -36,6 +36,14 @@ class LegalCaseService
                 throw ValidationException::withMessages([__('Group not found')]);
             }
             $this->validateUserCanCreateCase($group);
+            foreach ($participants as $participant) {
+                if ($participant['role'] == 'defendant') {
+                    if ($this->groupPermissionService->hasPermission($participant['user_id'], $group, 'lawsuit_immunity')) {
+                        throw ValidationException::withMessages([__('The defendant has immunity against lawsuits')]);
+                    }
+                }
+            }
+
             $legalCase = $this->repo->create($request);
             $attachments = $this->collectAttachments($request);
             $this->uploadAttachments($legalCase, $attachments);

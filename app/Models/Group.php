@@ -39,4 +39,10 @@ class Group extends Model
     {
         return $this->hasMany(GroupRolePermission::class);
     }
+
+    public function userPermissions()
+    {
+        return $this->hasMany(GroupUserPermission::class);
+    }
+
 }

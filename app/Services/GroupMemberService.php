@@ -13,7 +13,7 @@ use Illuminate\Validation\ValidationException;
 
 class GroupMemberService
 {
-    public function __construct(protected GroupRepository $repo)
+    public function __construct(protected GroupRepository $repo , protected GroupPermissionService $permissionService)
     {
     }
 
@@ -43,6 +43,14 @@ class GroupMemberService
        if($user->id === $group->user_id){
            throw ValidationException::withMessages([ __('You cannot invite the group creator to the group')]);
        }
+       if (!$this->permissionService->hasPermission(
+           auth()->id(),
+           $group,
+           'invite_members'
+       )) {
+           throw ValidationException::withMessages(['You are not authorized to invite members to the group.']);
+       }
+       
 
        $pivot = $this->repo->getGroupMemberPivot($group, $user);
        if ($pivot) {
@@ -115,11 +123,19 @@ class GroupMemberService
         $currentUser = auth()->user();
         $userId = $user->id;
 
-        // Check if current user is the owner
-        if ($group->user_id !== $currentUser->id) {
-            throw ValidationException::withMessages([
-                'group_id' => __('Only the group owner can remove members'),
-            ]);
+        // // Check if current user is the owner
+        // if ($group->user_id !== $currentUser->id) {
+        //     throw ValidationException::withMessages([
+        //         'group_id' => __('Only the group owner can remove members'),
+        //     ]);
+        // }
+
+        if (!$this->permissionService->hasPermission(
+            auth()->id(),
+            $group,
+            'remove_members'
+        )) {
+            throw ValidationException::withMessages(['You are not authorized to remove members from the group.']);
         }
 
         // Check if user is a member of the group
@@ -146,11 +162,11 @@ class GroupMemberService
         $userId = $data['user_id'];
         $newRole = $data['role'];
 
-        if ($group->user_id !== $currentUser->id) {
-            throw ValidationException::withMessages([
-                'group_id' => __('Only the group owner can change roles'),
-            ]);
-        }
+        // if ($group->user_id !== $currentUser->id) {
+        //     throw ValidationException::withMessages([
+        //         'group_id' => __('Only the group owner can change roles'),
+        //     ]);
+        // }
 
         $member = $group->users()->where('user_id', $userId)->wherePivot('status', 'accepted')->first();
         if (!$member) {
@@ -158,6 +174,7 @@ class GroupMemberService
                 'user_id' => __('User is not a member of this group'),
             ]);
         }
+        $this->checkRoleChangeAllowed($group, $userId, $newRole);
          // Check for open cases, excluding WITNESS
         $this->checkForOpenCasesExcludingRole($group, $userId, \App\Enums\CaseRole::WITNESS->value);
 
@@ -176,6 +193,27 @@ class GroupMemberService
 
         DB::commit();
         return true;
+    }
+
+    private function checkRoleChangeAllowed($group, $userId ,$newRole)
+    {
+        if($newRole == GroupRole::LAWYER->value){
+            $permission = 'assign_lawyers';
+          
+        }
+        else if($newRole == GroupRole::CONSULTANT->value){
+            $permission = 'assign_consultants';
+        }else{
+            $permission = 'assign_citizens';
+        }
+        if(!$this->permissionService->hasPermission(
+            auth()->id(),
+            $group,
+            $permission
+        )) {
+            throw ValidationException::withMessages(['You are not authorized to change member roles in the group.']);
+       
+     }
     }
 
     private function checkForOpenCasesExcludingRole($group, $userId, $excludedRole)

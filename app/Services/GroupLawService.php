@@ -33,7 +33,7 @@ class GroupLawService
             Group::findOrFail($data['group_id']),
             'add_laws'
         )) {
-            throw ValidationException::withMessages(['You are not authorized to create a law change request.']);
+            throw ValidationException::withMessages(['You are not authorized to create a law .']);
         }
 
 
@@ -50,6 +50,13 @@ class GroupLawService
                 'reason' => $data['reason']
             ]);
         }
+        if (!$this->permissionService->hasPermission(   
+            auth()->id(),
+            Group::findOrFail($groupLaw->group_id),
+            'edit_law'
+        )) {
+            throw ValidationException::withMessages(['You are not authorized to update a law.']);
+        }
 
         return $this->createPoll(array_merge($data, ['group_law_id' => $groupLaw->id , 'group_id' => $groupLaw->group_id]), ChatPollType::UPDATE_LAW->value);
     }
@@ -60,6 +67,13 @@ class GroupLawService
 
         if ($this->isGroupOwner($groupLaw->group_id)) {
             return $this->repo->delete($groupLaw);
+        }
+        if (!$this->permissionService->hasPermission(
+            auth()->id(),
+            Group::findOrFail($groupLaw->group_id),
+            'delete_law'
+        )) {
+            throw ValidationException::withMessages(['You are not authorized to delete a law.']);
         }
 
         return $this->createPoll(array_merge($data, ['group_law_id' => $groupLaw->id , 'group_id' => $groupLaw->group_id]), ChatPollType::DELETE_LAW->value);

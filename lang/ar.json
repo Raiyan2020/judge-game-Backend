@@ -163,6 +163,15 @@
      "owner":"المالك",
      "members count":"عدد الأعضاء",
      "legal cases count":"عدد القضايا القانونية",
-     "The defendant has immunity against lawsuits":"المدعى عليه لديه حصانة ضد الدعاوى القضائية"
+     "The defendant has immunity against lawsuits":"المدعى عليه لديه حصانة ضد الدعاوى القضائية",
+     "points":"النقاط",
+     "action":"حدث",
+     "role":"الدور",
+     "plaintiff_lawyer":"محامي المدعي",
+     "defendant_lawyer":"محامي المدعي عليه",
+     "all":"الكل",
+     "citizen":"مواطن",
+     "consultant":"مستشار",
+     "judge":"قاضي"
    
 }

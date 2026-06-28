@@ -69,6 +69,17 @@
                         data-i18n="Starter kit"> {{ __('groups') }} </span></a>
             </li>
 
+             <li class=" nav-item {{ request()->is('dashboard/role-actions*') ? 'active' : '' }}">
+                <a href="{{ route('admin.role-actions.index') }}"><i class="feather icon-tag"></i><span class="menu-title"
+                        data-i18n="Starter kit"> {{ __('points') }} </span></a>
+            </li>
+
+             <li class=" nav-item {{ request()->is('dashboard/role-titles*') ? 'active' : '' }}">
+                <a href="{{ route('admin.role-titles.index') }}"><i class="feather icon-tag"></i><span class="menu-title"
+                        data-i18n="Starter kit"> {{ __('titles') }} </span></a>
+            </li>
+
+
             <li class=" nav-item {{ request()->is('dashboard/contacts*') ? 'active' : '' }}">
                 <a href="{{ route('admin.contacts.index') }}"><i class="feather icon-mail"></i><span class="menu-title"
                         data-i18n="Starter kit"> {{ __('contact us') }} </span></a>

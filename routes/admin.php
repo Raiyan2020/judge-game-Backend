@@ -11,6 +11,8 @@ use App\Http\Controllers\Admin\LastUpdateController;
 use App\Http\Controllers\Admin\LoginController;
 use App\Http\Controllers\Admin\PackageController;
 use App\Http\Controllers\Admin\PackageSubscriptionController;
+use App\Http\Controllers\Admin\RoleActionController;
+use App\Http\Controllers\Admin\RoleTitleController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\TipController;
 use App\Http\Controllers\Admin\UserController;
@@ -35,6 +37,7 @@ Route::group(['middleware' => ['auth:admin', 'localization']], function () {
         'last-updates' => LastUpdateController::class,
         'coupons' => CouponController::class,
         'packages' =>PackageController::class,
+        'role-titles'=>RoleTitleController::class
     ]);
     Route::get('subscriptions', [PackageSubscriptionController::class,'index'])->name('subscriptions.index');
     Route::get('groups', [GroupController::class,'index'])->name('groups.index');
@@ -46,5 +49,10 @@ Route::group(['middleware' => ['auth:admin', 'localization']], function () {
     Route::PUT('last-updates/change-status/{lastUpdate}', [LastUpdateController::class, 'changeStatus'])->name('last-updates.changeStatus');
     Route::PUT('coupons/change-status/{coupon}', [CouponController::class, 'changeStatus'])->name('coupons.changeStatus');
     Route::PUT('packages/change-status/{package}', [PackageController::class, 'changeStatus'])->name('packages.changeStatus');
+    Route::get('role-actions', [RoleActionController::class,'index'])->name('role-actions.index');
+    Route::get('role-actions/{role}', [RoleActionController::class,'edit'])->name('role-actions.edit');
+    Route::post('role-actions', [RoleActionController::class,'store'])->name('role-actions.store');
+    Route::get('roles-actions/{role}', [RoleActionController::class, 'getActions'])
+    ->name('roles-actions.get');
 
 });

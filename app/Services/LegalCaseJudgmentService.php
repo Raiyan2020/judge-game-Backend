@@ -57,9 +57,14 @@ class LegalCaseJudgmentService
             ]);
 
             $this->createCaseNews($legalCase, $judgment);
+            $winnerId = null;
 
-            if (in_array($judgment->judgment_type, [LegalCaseJudgmentType::DISMISSED->value, LegalCaseJudgmentType::ACQUITTAL->value])) {
-                $legalCase->update(['status' => LegalCaseStatus::CLOSED->value , 'winner_id' => $legalCase->defendant?->user_id]);
+            if ($data['judgment_type'] === LegalCaseJudgmentType::ACQUITTAL->value) {
+                $winnerId = $legalCase->defendant?->user_id;
+            }
+
+            if ($isFinal) {
+                $legalCase->update(['status' => LegalCaseStatus::CLOSED->value, 'winner_id' => $winnerId]);
             } else {
                 $legalCase->update(['status' => LegalCaseStatus::ONGOING->value]);
             }
@@ -105,7 +110,7 @@ class LegalCaseJudgmentService
                 'is_final' => true,
             ]);
 
-            $legalCase->update(['status' => LegalCaseStatus::EXECUTION->value , 'winner_id' => $data['judgment_type'] === LegalCaseJudgmentType::CONVICTION->value ? $legalCase->plaintiff?->user_id : $legalCase->defendant?->user_id]);
+            $legalCase->update(['status' => LegalCaseStatus::EXECUTION->value, 'winner_id' => $data['judgment_type'] === LegalCaseJudgmentType::CONVICTION->value ? $legalCase->plaintiff?->user_id : $legalCase->defendant?->user_id]);
 
             $this->createFinalJudgmentNews($legalCase, $judgment);
 
@@ -120,7 +125,7 @@ class LegalCaseJudgmentService
 
     private function createFinalJudgmentNews(LegalCase $legalCase, $judgment): void
     {
-        $message = $this->getFinalJudgmentNotificationData($judgment , $legalCase);
+        $message = $this->getFinalJudgmentNotificationData($judgment, $legalCase);
 
         $this->legalCaseRepo->createCaseNews(
             $legalCase,
@@ -144,7 +149,7 @@ class LegalCaseJudgmentService
         Notification::send($users, new LegalCaseNotification($legalCase, $notificationData));
     }
 
-    private function getFinalJudgmentNotificationData($judgment , $legalCase): array
+    private function getFinalJudgmentNotificationData($judgment, $legalCase): array
     {
         return match ($judgment->judgment_type) {
             LegalCaseJudgmentType::CONVICTION->value => [
@@ -214,7 +219,7 @@ class LegalCaseJudgmentService
         Notification::send($users, new LegalCaseNotification($legalCase, $notificationData));
     }
 
-    private function getJudgmentNotificationData($judgment , $legalCase): array
+    private function getJudgmentNotificationData($judgment, $legalCase): array
     {
         return match ($judgment->judgment_type) {
             LegalCaseJudgmentType::CONVICTION->value => [
@@ -274,7 +279,7 @@ class LegalCaseJudgmentService
         try {
             DB::beginTransaction();
 
-         $legalCase = $this->legalCaseRepo->find($data['legal_case_id']);
+            $legalCase = $this->legalCaseRepo->find($data['legal_case_id']);
 
             if ($legalCase->status !== LegalCaseStatus::ONGOING->value) {
                 throw ValidationException::withMessages([
@@ -282,7 +287,7 @@ class LegalCaseJudgmentService
                 ]);
             }
             $this->ensureUserIsDefendantLawyer($legalCase);
-            $legalCase->update(['status' => LegalCaseStatus::CLOSED->value , 'winner_id' =>$legalCase->plaintiff?->user_id]);
+            $legalCase->update(['status' => LegalCaseStatus::CLOSED->value, 'winner_id' => $legalCase->plaintiff?->user_id]);
             $judgment = $legalCase->firstInstanceJudgment;
             if ($judgment) {
                 $judgment->update(['is_final' => true]);
@@ -292,7 +297,6 @@ class LegalCaseJudgmentService
             DB::commit();
 
             return $legalCase;
-
         } catch (\Exception $e) {
             DB::rollBack();
             throw $e;
@@ -323,7 +327,7 @@ class LegalCaseJudgmentService
             'case_acceptance_ruling',
             $message,
             auth()->id(),
-             $legalCase->defendant?->user_id
+            $legalCase->defendant?->user_id
         );
 
         $notificationData = [

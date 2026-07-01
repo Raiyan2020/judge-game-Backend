@@ -4,11 +4,12 @@ namespace App\Services;
 
 use App\Enums\CaseRole;
 use App\Enums\LegalCaseStatus;
+use App\Models\LegalCaseOpinion;
 use App\Notifications\LegalCaseNotification;
 use App\Repositories\LegalCaseRepository;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Facades\DB;
 
 
 class LegalCaseOpinionServices
@@ -151,7 +152,7 @@ class LegalCaseOpinionServices
 
             $legalCaseOpinion = $legalCase->opinions()->create($opinionData);
 
-        
+
 
             $this->createAppealNews($legalCase, $role);
 
@@ -211,8 +212,8 @@ class LegalCaseOpinionServices
             $legalCase,
             'case_appeal_request',
             [
-                'ar' => 'تم طلب استئناف للقضية رقم ' . $legalCase->id ,
-                'en' => 'An appeal request was made for the case number ' . $legalCase->id ,
+                'ar' => 'تم طلب استئناف للقضية رقم ' . $legalCase->id,
+                'en' => 'An appeal request was made for the case number ' . $legalCase->id,
             ],
             auth()->id(),
             $legalCase->judge?->user_id
@@ -298,5 +299,15 @@ class LegalCaseOpinionServices
                     ->toMediaCollection($collection);
             }
         }
+    }
+
+    public function reviewOpinion(LegalCaseOpinion $opinion, bool $isCorrect)
+    {
+
+        $opinion->update([
+            'is_correct' => $isCorrect,
+        ]);
+
+        return $opinion;
     }
 }

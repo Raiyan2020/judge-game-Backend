@@ -54,7 +54,7 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::post('groups/{group}/reject', [GroupMemberController::class, 'rejectInvitation']);
         Route::post('groups/{group}/users/{user}/remove-member', [GroupMemberController::class, 'removeMember']);
         Route::post('groups/{group}/change-role', [GroupMemberController::class, 'changeRole']);
-        Route::post('groups/{group}/leave', [GroupMemberController::class, 'leaveGroup']);     
+        Route::post('groups/{group}/leave', [GroupMemberController::class, 'leaveGroup']);
 
         Route::apiResource('group-laws', GroupLawController::class)->only(['store', 'update', 'destroy']);
         Route::get('group-laws/{group}', [GroupLawController::class, 'index']);
@@ -68,6 +68,7 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::get('legal-cases/{legalCase}', [LegalCaseController::class, 'show']);
         Route::get('legal-cases/groups/{group}', [LegalCaseController::class, 'index']);
         Route::get('legal-cases-status', [LegalCaseController::class, 'getCaseStatus']);
+        Route::PUT('legal-case-opinions/{opinion}/review',[LegalCaseOpinionController::class, 'reviewOpinion']);
         Route::get('news', [LegalCaseNewsController::class, 'index']);
         Route::get('packages', [PackageController::class, 'index']);
         Route::post('packages/subscribe', [PackageSubscriptionController::class, 'subscribe']);

@@ -172,6 +172,14 @@
      "all":"الكل",
      "citizen":"مواطن",
      "consultant":"مستشار",
-     "judge":"قاضي"
+     "judge":"قاضي",
+     "lawyer":"محامي",
+     "Select Role":"اختر الدور",
+     "Required Count":"العدد المطلوب",
+     "Action":"العمليه",
+     "titles":"الالقاب",
+     "role titles":"اللقاب الادوار",
+     "opinion reviewed successfully":"تم مراجعة الرأي بنجاح"
+
    
 }

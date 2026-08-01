@@ -15,7 +15,7 @@
 
     # Keep application endpoints in Laravel and proxy all public website
     # routes to the local standalone Next.js service.
-    RewriteCond %{REQUEST_URI} !^/(api|dashboard|storage|_dashboard|ckeditor|up|success|error|change-language)(/|$) [NC]
+    RewriteCond %{REQUEST_URI} !^/(api|dashboard|storage|_dashboard|ckeditor|up|success|error|change-language|index\.php)(/|$) [NC]
     RewriteRule ^(.*)$ http://127.0.0.1:3031/$1 [P,L]
 
     # Redirect Trailing Slashes If Not A Folder...

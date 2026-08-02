@@ -21,6 +21,15 @@ class GroupResource extends JsonResource
             'creator_id' => $this->user_id,
             'description' => $this->description,
             'members_count' => $this->members_count ?? 1,
+            // The signed-in user's membership status in this group
+            // (accepted | pending) — lets the app tell a joined group from a
+            // pending invitation.
+            'status' => $this->pivot?->status ?? null,
+            // Real group points (sum of members' points) + global rank, attached
+            // by GroupService::getUserGroups. Absent on endpoints that don't set
+            // them → 0 (the app renders "—" for an unranked/zero group).
+            'points' => (int) ($this->points ?? 0),
+            'global_rank' => (int) ($this->global_rank ?? 0),
             'my_role' => $this->pivot?->role ?? null,
         ];
     }

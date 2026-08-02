@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\V1\LegalCaseJudgmentController;
 use App\Http\Controllers\Api\V1\LegalCaseNewsController;
 use App\Http\Controllers\Api\V1\LegalCaseOpinionController;
 use App\Http\Controllers\Api\V1\MessageController;
+use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PackageController;
 use App\Http\Controllers\Api\V1\PackageSubscriptionController;
 use App\Http\Controllers\Api\V1\PermissionController;
@@ -40,11 +41,18 @@ Route::group(['middleware' => 'setLocale'], function () {
             Route::get('profile', [ProfileController::class, 'show']);
             Route::post('profile', [ProfileController::class, 'update']);
             Route::post('update-setting', [ProfileController::class, 'updateSetting']);
+            Route::post('fcm-token', [ProfileController::class, 'updateFcmToken']);
             Route::post('logout', [AuthController::class, 'logout']);
         });
 
+        // Notifications (Laravel database notifications). The controller already
+        // existed but was never routed, so the app fell back to a static mock.
+        Route::get('notifications', [NotificationController::class, 'index']);
+        Route::post('notifications/mark-read', [NotificationController::class, 'markAsRead']);
+
         Route::apiResource('groups', GroupController::class)->only(['index', 'store', 'update']);
         Route::get('my-groups', [GroupController::class, 'myGroups']);
+        Route::get('my-invitations', [GroupController::class, 'myInvitations']);
         Route::post('groups/{group}/leave', [GroupController::class, 'leaveGroup']);
         Route::delete('groups/{group}/members/{userId}', [GroupController::class, 'removeMember']);
         Route::patch('groups/{group}/members/{userId}/role', [GroupController::class, 'changeRole']);

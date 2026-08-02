@@ -15,6 +15,15 @@ class PackageSubscriptionService
 
     public function subscribeToPackage(array $data)
     {
+        // Block a new subscription while the user already has an active (paid,
+        // unexpired) one — the app had no such guard, so re-subscribing just
+        // stacked another row.
+        if (auth()->user()?->activeSubscription()->exists()) {
+            throw ValidationException::withMessages([
+                'package_id' => __('You already have an active subscription.'),
+            ]);
+        }
+
         $package = $this->repo->find($data['package_id']);
 
         if (! $package) {

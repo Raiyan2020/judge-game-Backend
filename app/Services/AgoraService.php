@@ -12,7 +12,9 @@ class AgoraService
     {
         $appId = config('agora.agora.app_id');
         $appCertificate = config('agora.agora.app_certificate');
-        $channelName = $room->name;
+        // Use a stable ASCII channel id, NOT the user-entered room name (which
+        // can be Arabic/long and violate Agora's channel-name constraints).
+        $channelName = 'room_' . $room->id;
 
         $uid = auth()->id();
         $role = RtcTokenBuilder::RolePublisher;

@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\ChangeRoleRequest;
 use App\Http\Requests\Api\V1\GroupRequest;
 use App\Http\Requests\Api\V1\GroupUpdateRequest;
+use App\Http\Resources\Api\V1\GroupInvitationResource;
 use App\Http\Resources\Api\V1\GroupResource;
 use App\Models\Group;
 use App\Services\GroupService;
@@ -47,6 +48,12 @@ class GroupController extends Controller
    {
        $groups = $this->groupService->getUserGroups();
        return \responder::success(GroupResource::collection($groups));
+   }
+
+   public function myInvitations()
+   {
+       $invitations = $this->groupService->getMyInvitations();
+       return \responder::success(GroupInvitationResource::collection($invitations));
    }
 
   

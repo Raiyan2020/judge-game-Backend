@@ -29,9 +29,28 @@ class GroupRepository extends BaseRepository
         return $group->load('users');
     }
 
+    public function getUserPendingInvitations($user)
+    {
+        // The groups the user has a PENDING invitation to — for the
+        // "My Invitations" screen (accept / reject).
+        return $user->groups()
+            ->wherePivot('status', 'pending')
+            ->withPivot('role')
+            ->withCount('users as members_count')
+            ->with('owner')
+            ->get();
+    }
+
     public function getUserGroupsWithRoles($user)
     {
-        return  $user->groups()->withPivot('role')->withCount('users as members_count')->get();
+        // Only ACCEPTED memberships — a pending invitation must NOT show up in
+        // /my-groups (it used to, letting the invitee enter the group without
+        // ever accepting the invite).
+        return $user->groups()
+            ->wherePivot('status', 'accepted')
+            ->withPivot('role', 'status')
+            ->withCount('users as members_count')
+            ->get();
     }
 
     public function getGroupMembers($group)

@@ -24,48 +24,78 @@ class GroupMemberService
 
    public function inviteMember(Group $group, array $data)
    {
-       $query = User::query();
-       if (isset($data['phone'])) {
-           $query->where('phone', $data['phone']);
+       // Look the invitee up by phone or username. Phone is stored bare (with
+       // country_code in its own column), so match on the digits alone AND on
+       // country_code+phone — otherwise a number typed with its dial code, or
+       // with spaces/+, would miss a registered user. (The old exact `where`
+       // + `orWhere` also OR'd the two fields, which was a scoping bug.)
+       $user = null;
+       if (!empty($data['phone'])) {
+           $digits = preg_replace('/\D/', '', $data['phone']);
+           $user = User::query()
+               ->where('phone', $digits)
+               ->orWhereRaw('CONCAT(country_code, phone) = ?', [$digits])
+               ->first();
        }
-       if (isset($data['username'])) {
-           $query->orWhere('username', $data['username']);
+       if (!$user && !empty($data['username'])) {
+           $user = User::where('username', $data['username'])->first();
        }
-       $user = $query->first();
 
        if (!$user) {
-           throw ValidationException::withMessages([ __('User not found with the provided phone or username')]);
+           throw ValidationException::withMessages([ __('User not found.')]);
        }
 
        if ($user->id === auth()->id()) {
-           throw ValidationException::withMessages([ __('You cannot invite yourself to the group')]);
+           throw ValidationException::withMessages([ __('You cannot invite yourself to the group.')]);
        }
        if($user->id === $group->user_id){
-           throw ValidationException::withMessages([ __('You cannot invite the group creator to the group')]);
+           throw ValidationException::withMessages([ __('You cannot invite the group creator to the group.')]);
        }
        if (!$this->permissionService->hasPermission(
            auth()->id(),
            $group,
            'invite_members'
        )) {
-           throw ValidationException::withMessages(['You are not authorized to invite members to the group.']);
+           throw ValidationException::withMessages([ __('You are not authorized to invite members to the group.')]);
        }
-       
+
 
        $pivot = $this->repo->getGroupMemberPivot($group, $user);
        if ($pivot) {
            if ($pivot->status === 'pending') {
-               throw ValidationException::withMessages([ __('User already has a pending invitation to the group')]);
+               throw ValidationException::withMessages([ __('User has already been invited to the group.')]);
            }
 
-           throw ValidationException::withMessages([ __('User is already a member of the group')]);
+           throw ValidationException::withMessages([ __('User is already a member of the group.')]);
        }
 
-       $this->repo->attachGroupMember($group, $user, [
-           'role' => $data['role'],
-           'status' => 'pending',
-           'title' => $data['role'],
-       ]);
+       DB::transaction(function () use ($group, $user, $data) {
+           $this->repo->attachGroupMember($group, $user, [
+               'role' => $data['role'],
+               'status' => 'pending',
+               'title' => $data['role'],
+           ]);
+       });
+
+       // Notify the invitee so the invitation actually surfaces in their
+       // notifications (carrying THIS group's id/name, not a stale one). Sent
+       // AFTER the pivot is committed and fail-soft: a notification failure must
+       // not roll back the (successful) invite nor surface as an invite error.
+       try {
+           $inviter = auth()->user();
+           $user->notify(new \App\Notifications\GroupInvitationNotification($group, $inviter));
+
+           // Real push so the invite arrives without opening the app. Fail-soft
+           // and a no-op until Firebase credentials are configured.
+           app(\App\Services\FcmService::class)->sendToToken(
+               $user->fcm_token,
+               $group->name,
+               trim(($inviter?->name ?? '') . ' دعاك للانضمام إلى ' . $group->name),
+               ['type' => 'group_invite', 'id' => $group->id],
+           );
+       } catch (\Throwable $e) {
+           \Log::warning('Group invite notification failed: ' . $e->getMessage());
+       }
 
        return $user;
    }

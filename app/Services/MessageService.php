@@ -23,8 +23,11 @@ class MessageService
         $query = ChatMessage::query()->with([
             'user',
             'chat',
-            'poll.options' => function ($q) {
-                $q->withCount('votes');
+            'poll.options' => function ($q) use ($userId) {
+                $q->withCount('votes')
+                  ->withCount(['votes as mine_count' => function ($v) use ($userId) {
+                      $v->where('user_id', $userId);
+                  }]);
             }
         ]);
 
@@ -229,20 +232,24 @@ class MessageService
     {
         $poll = ChatPoll::where('chat_message_id', $messageId)->firstOrFail();
 
-        if ($poll->is_closed) {
+        // Closed OR past its expiry — the app also stops sending a vote here.
+        if ($poll->is_closed || ($poll->expires_at && $poll->expires_at->isPast())) {
             throw ValidationException::withMessages(['This poll is closed']);
         }
 
         $option = $poll->options()->where('id', $optionId)->firstOrFail();
+        $userId = auth('sanctum')->id();
 
-        $existingVote = $option->votes()->where('user_id', auth('sanctum')->id())->first();
-
-        if ($existingVote) {
-            throw ValidationException::withMessages(['You have already voted in this poll']);
-        }
+        // MOVE the user's vote: drop any existing vote across the WHOLE poll
+        // first, then record the new one — so a user is never counted in two
+        // options (the old code only checked the option being voted for, which
+        // let "yes" then "no" both stick).
+        \App\Models\ChatPollVote::whereIn('chat_poll_option_id', $poll->options()->pluck('id'))
+            ->where('user_id', $userId)
+            ->delete();
 
         return $option->votes()->create([
-            'user_id' => auth('sanctum')->id(),
+            'user_id' => $userId,
         ]);
     }
 }

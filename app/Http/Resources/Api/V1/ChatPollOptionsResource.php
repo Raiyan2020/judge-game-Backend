@@ -13,6 +13,10 @@ class ChatPollOptionsResource extends JsonResource
             'id' => $this->id,
             'option' => $this->option,
             'votes_count' =>  $this->votes_count ,
+            // Whether the CURRENT user's vote sits on this option (from the
+            // per-user vote count eager-loaded in MessageService::index). Lets
+            // the app restore the selection on reload.
+            'is_mine' => ($this->mine_count ?? 0) > 0,
         ];
     }
 }

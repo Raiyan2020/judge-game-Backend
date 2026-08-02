@@ -27,6 +27,18 @@ class ProfileController extends Controller
     }
 
     /**
+     * Store/refresh the caller's FCM device token so pushes reach them. Called
+     * by the app after login and whenever the token rotates.
+     */
+    public function updateFcmToken(Request $request)
+    {
+        $request->validate(['fcm_token' => 'required|string']);
+        $user = auth()->user();
+        $user->update(['fcm_token' => $request->fcm_token]);
+        return \responder::success(__('Token updated'));
+    }
+
+    /**
      * Update the authenticated user's profile.
      *
      * @param Request $request

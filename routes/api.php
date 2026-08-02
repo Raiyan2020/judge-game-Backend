@@ -53,7 +53,6 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::apiResource('groups', GroupController::class)->only(['index', 'store', 'update']);
         Route::get('my-groups', [GroupController::class, 'myGroups']);
         Route::get('my-invitations', [GroupController::class, 'myInvitations']);
-        Route::post('groups/{group}/leave', [GroupController::class, 'leaveGroup']);
         Route::delete('groups/{group}/members/{userId}', [GroupController::class, 'removeMember']);
         Route::patch('groups/{group}/members/{userId}/role', [GroupController::class, 'changeRole']);
         Route::get('groups/{group}/members', [GroupMemberController::class, 'index']);

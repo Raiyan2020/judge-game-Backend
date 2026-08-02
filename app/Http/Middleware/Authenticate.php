@@ -20,14 +20,19 @@ class Authenticate extends Middleware
 
     protected function redirectTo($request)
     {
+        // API clients must receive an authentication response, not a redirect
+        // to a web login route that does not exist for the default guard.
+        if ($request->is('api/*') || $request->expectsJson()) {
+            return null;
+        }
+
         if (in_array('admin', $this->guards)) {
             return route('admin.login');
         }
         if (in_array('club', $this->guards)) {
             return route('club.login');
         }
-        if (! $request->expectsJson()) {
-            return route('login');
-        }
+
+        return null;
     }
 }

@@ -4,6 +4,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Foundation\Configuration\Schedule;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -38,6 +39,15 @@ return Application::configure(basePath: dirname(__DIR__))
     //     $schedule->job(new \App\Jobs\ProcessExpiredPolls)->hourly();
     // })
     ->withExceptions(function (Exceptions $exceptions) {
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'status' => false,
+                    'msg' => __('Unauthenticated.'),
+                ], 401);
+            }
+        });
+
         $exceptions->render(function (ValidationException $e, Request $request) {
             if ($request->expectsJson()) {
                 return \responder::error(\Arr::first(\Arr::first($e->errors())));
@@ -46,4 +56,3 @@ return Application::configure(basePath: dirname(__DIR__))
         });
         //
     })->create();
-

@@ -18,7 +18,10 @@ class PermissionRequest extends FormRequest
            'group_id' => ['required', 'exists:groups,id'],
            'user_id' => ['nullable', 'exists:users,id'],
            'permission_id' => ['required', 'exists:permissions,id'],
-           'role' => ['nullable', new Enum(\App\Enums\GroupRole::class)],
+           // A role-scoped toggle needs a role; without it (and without a
+           // user_id) the service would try to persist a NULL role into a
+           // NOT NULL column and 500. Require one of the two targets.
+           'role' => ['nullable', 'required_without:user_id', new Enum(\App\Enums\GroupRole::class)],
         ];
     }
 }

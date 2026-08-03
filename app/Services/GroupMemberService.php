@@ -192,11 +192,21 @@ class GroupMemberService
         $userId = $data['user_id'];
         $newRole = $data['role'];
 
-        // if ($group->user_id !== $currentUser->id) {
-        //     throw ValidationException::withMessages([
-        //         'group_id' => __('Only the group owner can change roles'),
-        //     ]);
-        // }
+        // The judge is the group OWNER, permanently (the case always presides
+        // under `group->user_id`). So the judge role is NOT reassignable, and
+        // the owner's own role cannot be changed — otherwise a member would
+        // hold a `judge` pivot with no real judging power (a dead-end), or the
+        // owner could be demoted and then file + judge their own case.
+        if ($newRole === GroupRole::JUDGE->value) {
+            throw ValidationException::withMessages([
+                'role' => __('The judge role belongs to the group owner and cannot be reassigned'),
+            ]);
+        }
+        if ((int) $userId === (int) $group->user_id) {
+            throw ValidationException::withMessages([
+                'user_id' => __('The group owner role cannot be changed'),
+            ]);
+        }
 
         $member = $group->users()->where('user_id', $userId)->wherePivot('status', 'accepted')->first();
         if (!$member) {
@@ -208,16 +218,6 @@ class GroupMemberService
          // Check for open cases, excluding WITNESS
         $this->checkForOpenCasesExcludingRole($group, $userId, \App\Enums\CaseRole::WITNESS->value);
 
-
-        if ($newRole === GroupRole::JUDGE->value) {
-            $existingJudge = $group->users()->wherePivot('role', GroupRole::JUDGE->value)->first();
-            if ($existingJudge && $existingJudge->id !== $userId) {
-                // Change existing judge to CITIZEN
-                $group->users()->updateExistingPivot($existingJudge->id, ['role' => GroupRole::CITIZEN->value]);
-            }
-        }
-
-       
         // Update the role
         $group->users()->updateExistingPivot($userId, ['role' => $newRole]);
 

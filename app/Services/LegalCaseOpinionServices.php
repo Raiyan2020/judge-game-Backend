@@ -46,11 +46,16 @@ class LegalCaseOpinionServices
 
             $attachments = $this->collectAttachments($request);
             $this->uploadAttachments($legalCaseOpinion, $attachments);
-            DB::commit();
+
+            // Register BEFORE committing so the notification fires after the
+            // real commit (matching requestAppeal, which already orders it
+            // correctly) — otherwise it runs synchronously and a throw rolls
+            // back an already-committed opinion.
             DB::afterCommit(function () use ($legalCase, $legalCaseOpinion) {
                 $this->notifyDefendantOnNewOpinion($legalCase, $legalCaseOpinion);
             });
 
+            DB::commit();
 
             return $legalCase;
         } catch (\Exception $e) {

@@ -14,6 +14,10 @@ class GroupLawService
 
     public function index($groupId)
     {
+        // Settle any expired law polls first, so a proposal that passed its 24h
+        // vote is materialised as a real law before the list is returned
+        // (the scheduler is optional — this makes approval self-contained).
+        $this->messageService->resolveExpiredPolls($groupId);
         return $this->repo->getByGroup($groupId);
     }
 

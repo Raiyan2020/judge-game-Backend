@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\CaseRole;
 use App\Enums\GroupRole;
+use App\Enums\LegalCaseStatus;
 use App\Models\User;
 use App\Notifications\LegalCaseNotification;
 use App\Repositories\GroupRepository;
@@ -18,8 +19,24 @@ class LegalCaseService
 
     public function index($filters, $groupId)
     {
+        // Lazily settle any full-distance cases before listing, so `execution`
+        // cases that finished their enforcement window show as `closed`.
+        $this->repo->closeExpiredExecutionCases($groupId);
         $filters['group_id'] = $groupId;
         return $this->repo->index($filters);
+    }
+
+    /**
+     * Close a single case if it has finished its execution window. Called on
+     * detail read so a case opened after the window shows as `closed`.
+     */
+    public function settleIfExecutionExpired($legalCase): void
+    {
+        if ($legalCase->status !== \App\Enums\LegalCaseStatus::EXECUTION->value) {
+            return;
+        }
+        $this->repo->closeExpiredExecutionCases($legalCase->group_id);
+        $legalCase->refresh();
     }
 
 
@@ -59,11 +76,16 @@ class LegalCaseService
             $legalCase->participants()->createMany($participants);
             $legalCase->groupLaws()->attach($request['group_law_ids']);
             $this->createCaseNews($legalCase, $userId, $participants);
-            DB::commit();
 
+            // Register BEFORE committing so the callback fires AFTER the real
+            // commit. Called after `DB::commit()` (no active transaction) it
+            // runs synchronously, and a notification throw would then roll back
+            // an already-committed case → a 500 for a case that was created.
             DB::afterCommit(function () use ($legalCase) {
                 $this->sendNotificationToPlaintiffLawyer($legalCase);
             });
+
+            DB::commit();
 
             return $legalCase;
         } catch (\Exception $e) {
@@ -169,6 +191,26 @@ class LegalCaseService
     public function assignDefendantLawyer($request)
     {
         $case = $this->repo->find($request['legal_case_id']);
+        $userId = auth()->id();
+
+        // Only the DEFENDANT of this case may appoint their defence lawyer —
+        // the endpoint was previously open to any subscribed user on any case.
+        $isDefendant = $case->participants()
+            ->where('user_id', $userId)
+            ->where('role', CaseRole::DEFENDANT->value)
+            ->exists();
+
+        if (! $isDefendant) {
+            throw ValidationException::withMessages([__('You are not authorized to perform this action')]);
+        }
+
+        // Assignable while the case is still open at the first-instance stage
+        // (new or ongoing) — the defence lawyer accepts/appeals the first
+        // ruling, so late appointment at `ongoing` must stay possible; only
+        // appeal / execution / closed are too late.
+        if (! in_array($case->status, [LegalCaseStatus::NEW->value, LegalCaseStatus::ONGOING->value], true)) {
+            throw ValidationException::withMessages([__('The case is no longer open for assigning a lawyer')]);
+        }
 
         $existingLawyer = $case->participants()
             ->where('role', CaseRole::DEFENDANT_LAWYER->value)
@@ -176,6 +218,19 @@ class LegalCaseService
 
         if ($existingLawyer) {
             throw ValidationException::withMessages([__('A defendant lawyer is already assigned to this case')]);
+        }
+
+        // The chosen lawyer must actually be a `lawyer` member of the case's
+        // group — not an arbitrary user id.
+        $isGroupLawyer = $case->group
+            ->users()
+            ->where('user_id', $request['lawyer_id'])
+            ->wherePivot('role', GroupRole::LAWYER->value)
+            ->wherePivot('status', 'accepted')
+            ->exists();
+
+        if (! $isGroupLawyer) {
+            throw ValidationException::withMessages([__('The selected lawyer is not a lawyer in this group')]);
         }
 
         $case->participants()->create([
@@ -206,8 +261,10 @@ class LegalCaseService
         }
     }
 
-    public function getCasesStatus()
+    public function getCasesStatus($groupId = null)
     {
-        return $this->repo->getCasesStatus();
+        // Settle finished execution cases first so the counters are honest.
+        $this->repo->closeExpiredExecutionCases($groupId);
+        return $this->repo->getCasesStatus($groupId);
     }
 }

@@ -95,6 +95,17 @@ class LegalCaseJudgmentService
             $this->ensureUserIsJudge($legalCase);
             $this->ensureCaseIsNotClosed($legalCase);
 
+            // A final judgment is the APPEAL-stage ruling — it may only be
+            // issued for a case actually under appeal. Without this a judge
+            // could jump `ongoing → execution`, skipping the appeal entirely
+            // AND recording a `stage = appeal` judgment for an appeal that
+            // never happened.
+            if ($legalCase->status !== LegalCaseStatus::APPEAL->value) {
+                throw ValidationException::withMessages([
+                    'legal_case_id' => __('A final judgment can only be issued for a case under appeal'),
+                ]);
+            }
+
             if ($legalCase->finalJudgment) {
                 throw ValidationException::withMessages([
                     'legal_case_id' => __('A final judgment already exists for this case'),

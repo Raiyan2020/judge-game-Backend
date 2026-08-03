@@ -2,8 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Models\ChatPoll;
-use App\Models\GroupLaw;
+use App\Services\MessageService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -20,65 +19,13 @@ class ProcessExpiredPolls implements ShouldQueue
     }
 
     /**
-     * Execute the job.
+     * Execute the job. Delegates to the service so the poll-settlement rule
+     * lives in ONE place — the same method is also called lazily on read
+     * (group laws / messages fetch), which is what actually settles polls
+     * while the scheduler is optional infrastructure.
      */
-    public function handle()
+    public function handle(MessageService $messageService)
     {
-        ChatPoll::query()
-            ->where('expires_at', '<=', now())
-            ->where('is_closed', false)
-            ->with('options.votes')
-            ->chunk(50, function ($polls) {
-
-                foreach ($polls as $poll) {
-
-                    $poll->update(['is_closed' => true]);
-
-                    $topOption = $poll->options
-                        ->map(function ($opt) {
-                            $opt->votes_count = $opt->votes->count();
-                            return $opt;
-                        })
-                        ->sortByDesc('votes_count')
-                        ->first();
-
-                    if (!$topOption) {
-                        continue;
-                    }
-
-                    $this->handlePollResult($poll, $topOption);
-                }
-            });
-    }
-
-    protected function handlePollResult($poll, $topOption)
-    {
-        switch ($poll->type) {
-
-            case 'delete_law':
-                if ($topOption->option === 'yes') {
-                    GroupLaw::find($poll->group_law_id)?->delete();
-                }
-                break;
-
-            case 'update_law':
-                if ($topOption->option === 'yes') {
-                    GroupLaw::find($poll->group_law_id)?->update([
-                       ['description' => $poll->data['description'] ?? null],
-                       ['reason' => $poll->data['reason'] ?? null],
-                    ]);
-                }
-                break;
-
-            case 'create_law':
-                if ($topOption->option === 'yes') {
-                    GroupLaw::create([
-                        'group_id' => $poll->chatMessage?->chat?->group_id,
-                        'description' => $poll->data['description'] ?? null,
-                        'reason' => $poll->data['reason'] ?? null,
-                    ]);
-                }
-                break;
-        }
+        $messageService->resolveExpiredPolls();
     }
 }

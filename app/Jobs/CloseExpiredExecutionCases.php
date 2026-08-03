@@ -2,8 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Enums\LegalCaseStatus;
-use App\Models\LegalCase;
+use App\Repositories\LegalCaseRepository;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -20,19 +19,13 @@ class CloseExpiredExecutionCases implements ShouldQueue
     }
 
     /**
-     * Execute the job.
+     * Execute the job. Delegates to the repository so the close rule lives in
+     * ONE place — the same method is also called lazily on read
+     * (`LegalCaseService`), which is what actually settles cases while the
+     * scheduler is optional infrastructure.
      */
-    public function handle()
+    public function handle(LegalCaseRepository $repo)
     {
-        LegalCase::query()
-            ->where('status', LegalCaseStatus::EXECUTION->value)
-            ->whereHas('finalJudgment', function ($query) {
-                $query->where('created_at', '<=', now()->subDays(7));
-            })
-            ->chunk(50, function ($cases) {
-                foreach ($cases as $case) {
-                    $case->update(['status' => LegalCaseStatus::CLOSED->value]);
-                }
-            });
+        $repo->closeExpiredExecutionCases();
     }
 }

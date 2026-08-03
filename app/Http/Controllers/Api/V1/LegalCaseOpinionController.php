@@ -9,6 +9,7 @@ use App\Http\Resources\Api\V1\LegalCaseResource;
 use App\Models\LegalCaseOpinion;
 use App\Services\LegalCaseOpinionServices;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class LegalCaseOpinionController extends Controller
 {
@@ -33,6 +34,15 @@ class LegalCaseOpinionController extends Controller
         $request->validate([
             'is_correct' => ['required', 'boolean'],
         ]);
+
+        // Only the presiding judge (the case's group owner) may rule an opinion
+        // correct/incorrect — this endpoint was previously open to any user.
+        $group = $opinion->legalCase?->group;
+        if (! $group || $group->user_id !== auth()->id()) {
+            throw ValidationException::withMessages([
+                __('You are not authorized to perform this action'),
+            ]);
+        }
 
         $this->legalCaseOpinionService->reviewOpinion(
             $opinion,

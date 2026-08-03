@@ -98,8 +98,9 @@ Route::group(['middleware' => 'setLocale'], function () {
             Route::post('add-first-judgment', [LegalCaseJudgmentController::class, 'storeFirstJudgment']);
             Route::post('add-final-judgment', [LegalCaseJudgmentController::class, 'storeFinalJudgment']);
             Route::post('accept-judgment', [LegalCaseJudgmentController::class, 'acceptJudgment']);
+            // `add-appeal-request` is the alias the app actually calls; it maps
+            // to the same `requestAppeal` as `request-appeal` above.
             Route::post('add-appeal-request', [LegalCaseOpinionController::class, 'requestAppeal']);
-            Route::post('add-final-judgment', [LegalCaseJudgmentController::class, 'storeFinalJudgment']);
         });
     });
 

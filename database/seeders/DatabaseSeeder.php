@@ -15,6 +15,12 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        // The permission catalogue MUST exist: `GroupPermissionService` looks a
+        // permission up by key and denies when the row is missing, so without
+        // this every non-owner permission check fails and the permissions
+        // screen has nothing to toggle. Idempotent (updateOrCreate by key).
+        $this->call(PermissionSeeder::class);
+
         // User::factory(10)->create();
 
         User::factory()->create([

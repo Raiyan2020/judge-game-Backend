@@ -23,21 +23,24 @@ class LegalCaseController extends Controller
 
     }
 
-    public function getCaseStatus()
+    public function getCaseStatus(Request $request)
     {
-        $legalCases = $this->legalCaseService->getCasesStatus();
+        $legalCases = $this->legalCaseService->getCasesStatus($request->group_id);
         return \responder::success($legalCases);
     }
 
     public function store(LegalCaseRequest $request)
     {
-        $this->legalCaseService->create($request->validated());
+        $legalCase = $this->legalCaseService->create($request->validated());
+        $legalCase->load($this->relations());
 
-        return \responder::success(__('Legal case created successfully'));
+        return \responder::success(new LegalCaseResource($legalCase));
     }
 
     public function show(LegalCase $legalCase)
     {
+        // A case that finished its enforcement window should read as `closed`.
+        $this->legalCaseService->settleIfExecutionExpired($legalCase);
         $legalCase->load($this->relations());
         return \responder::success(new LegalCaseResource($legalCase));
     }

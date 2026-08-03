@@ -8,6 +8,7 @@ use App\Models\Chat;
 use App\Models\ChatMessage;
 use App\Models\ChatPoll;
 use App\Models\Group;
+use App\Models\GroupLaw;
 use Illuminate\Validation\ValidationException;
 
 class MessageService
@@ -251,5 +252,67 @@ class MessageService
         return $option->votes()->create([
             'user_id' => $userId,
         ]);
+    }
+
+    /**
+     * Settle every poll whose 24h window has passed but is still open, applying
+     * the winning option (create / update / delete law when "yes" wins). This
+     * is the SAME rule as the `ProcessExpiredPolls` job, extracted here so it
+     * can also run lazily on read (group laws / group messages fetch) — a
+     * non-owner's law proposal actually resolves without a scheduler, which is
+     * otherwise optional infrastructure.
+     */
+    public function resolveExpiredPolls($groupId = null): void
+    {
+        ChatPoll::query()
+            ->where('expires_at', '<=', now())
+            ->where('is_closed', false)
+            ->when($groupId, function ($q) use ($groupId) {
+                $q->whereHas('chatMessage.chat', function ($sub) use ($groupId) {
+                    $sub->where('group_id', $groupId);
+                });
+            })
+            ->with(['options.votes', 'chatMessage.chat'])
+            ->chunk(50, function ($polls) {
+                foreach ($polls as $poll) {
+                    // Always close it so it is never re-evaluated, THEN apply.
+                    $poll->update(['is_closed' => true]);
+                    $this->applyPollResult($poll);
+                }
+            });
+    }
+
+    protected function applyPollResult($poll): void
+    {
+        $yes = $poll->options->firstWhere('option', 'yes')?->votes->count() ?? 0;
+        $no = $poll->options->firstWhere('option', 'no')?->votes->count() ?? 0;
+
+        // Enact ONLY on a carried affirmative majority. A no-quorum poll (0-0)
+        // or a tie must NOT pass — otherwise an unvoted "delete_law" proposal
+        // would silently delete the law the moment anyone opens the laws screen.
+        if ($yes === 0 || $yes <= $no) {
+            return;
+        }
+
+        switch ($poll->type) {
+            case ChatPollType::DELETE_LAW->value:
+                GroupLaw::find($poll->group_law_id)?->delete();
+                break;
+
+            case ChatPollType::UPDATE_LAW->value:
+                GroupLaw::find($poll->group_law_id)?->update([
+                    'description' => $poll->data['description'] ?? null,
+                    'reason' => $poll->data['reason'] ?? null,
+                ]);
+                break;
+
+            case ChatPollType::CREATE_LAW->value:
+                GroupLaw::create([
+                    'group_id' => $poll->chatMessage?->chat?->group_id,
+                    'description' => $poll->data['description'] ?? null,
+                    'reason' => $poll->data['reason'] ?? null,
+                ]);
+                break;
+        }
     }
 }

@@ -19,4 +19,9 @@ class LegalCaseOpinion extends Model implements HasMedia
     {
         return $this->belongsTo(User::class);
     }
+
+    public function legalCase()
+    {
+        return $this->belongsTo(LegalCase::class);
+    }
 }

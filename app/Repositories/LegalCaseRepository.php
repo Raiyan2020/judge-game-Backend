@@ -43,17 +43,37 @@ class LegalCaseRepository extends BaseRepository
         return $news;
     }
 
-    public function getCasesStatus()
+    public function getCasesStatus($groupId = null)
     {
       return $this->model
+        ->when($groupId, fn ($q) => $q->where('group_id', $groupId))
         ->selectRaw("
             COUNT(CASE WHEN status = 'new' THEN 1 END) as new_cases,
-            COUNT(CASE WHEN status = 'on_going' THEN 1 END) as on_going_cases,
+            COUNT(CASE WHEN status = 'ongoing' THEN 1 END) as on_going_cases,
             COUNT(CASE WHEN status = 'appeal' THEN 1 END) as appeal_cases,
             COUNT(CASE WHEN status = 'execution' THEN 1 END) as execution_cases,
             COUNT(CASE WHEN status = 'closed' THEN 1 END) as closed_cases
         ")
         ->first();
+    }
+
+    /**
+     * Close every case that has sat in `execution` for the full enforcement
+     * window (final judgment ≥ 7 days old). This is the SAME rule the
+     * `CloseExpiredExecutionCases` job runs — extracted here so it can also be
+     * triggered lazily on read (the scheduler is optional infrastructure), so
+     * a case that goes the full distance actually reaches `closed` instead of
+     * being stuck in `execution` forever.
+     */
+    public function closeExpiredExecutionCases($groupId = null): int
+    {
+        return $this->model->query()
+            ->where('status', LegalCaseStatus::EXECUTION->value)
+            ->when($groupId, fn ($q) => $q->where('group_id', $groupId))
+            ->whereHas('finalJudgment', function ($query) {
+                $query->where('created_at', '<=', now()->subDays(7));
+            })
+            ->update(['status' => LegalCaseStatus::CLOSED->value]);
     }
 
     public function getUserGroupStatistics(int $userId, int $groupId): array

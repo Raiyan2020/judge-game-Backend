@@ -41,6 +41,10 @@
     "latest bid":"Latest Bid",
     "pending":"Pending",
     "paid":"Paid",
-    "failed":"Failed"
-    
+    "failed":"Failed",
+    "new":"New",
+    "ongoing":"Ongoing",
+    "appeal":"Appeal",
+    "execution":"Under Enforcement",
+    "closed":"Closed"
 }

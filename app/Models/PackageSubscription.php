@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['package_id', 'user_id', 'coupon_id', 'coupon_code', 'price', 'discount', 'total', 'starts_at', 'ends_at', 'payment_method_id', 'payment_status', 'payment_url', 'payment_object'])]
+#[Fillable(['package_id', 'user_id', 'coupon_id', 'coupon_code', 'price', 'discount', 'total', 'starts_at', 'ends_at', 'payment_method_id', 'payment_invoice_id', 'payment_status', 'payment_url', 'payment_object'])]
 class PackageSubscription extends Model
 {
     protected $casts = [

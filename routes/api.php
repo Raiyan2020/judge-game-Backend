@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\V1\RoomController;
 use App\Http\Controllers\Api\V1\SettingController;
 use App\Http\Controllers\Api\V1\UserRankController;
 use App\Http\Controllers\Api\V1\UserStatisticsController;
+use App\Http\Controllers\Payment\WebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::group(['middleware' => 'setLocale'], function () {
@@ -80,6 +81,8 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::get('packages', [PackageController::class, 'index']);
         Route::post('packages/subscribe', [PackageSubscriptionController::class, 'subscribe']);
         Route::get('groups/{group}/users/{user}/statistics', [UserStatisticsController::class, 'show']);
+        // The signed-in user's achievement ladder in this group (real progress).
+        Route::get('groups/{group}/achievements', [\App\Http\Controllers\Api\V1\AchievementController::class, 'index']);
         Route::post('coupons', [CouponController::class, 'store']);
         Route::get('permissions', [PermissionController::class, 'index']);
         Route::post('permissions', [PermissionController::class, 'togglePermission']);
@@ -103,6 +106,13 @@ Route::group(['middleware' => 'setLocale'], function () {
             Route::post('add-appeal-request', [LegalCaseOpinionController::class, 'requestAppeal']);
         });
     });
+
+    // MyFatoorah server-to-server payment webhook — unauthenticated (no bearer
+    // from the gateway), CSRF-exempt (api group), verified via HMAC signature
+    // (when enforced) AND always re-checked against the MyFatoorah API. Throttled
+    // so a flood of forged invoice ids can't drive unbounded outbound API calls.
+    Route::post('payment/webhook', [WebhookController::class, 'handle'])
+        ->middleware('throttle:60,1');
 
     Route::get('home', HomeController::class);
     Route::get('banners', [BannerController::class, 'index']);

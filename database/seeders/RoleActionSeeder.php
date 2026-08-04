@@ -288,8 +288,12 @@ class RoleActionSeeder extends Seeder
                 ],
 
             ];
+        // Idempotent: keyed on (role, key) so re-running doesn't duplicate rows.
         foreach ($actions as $action) {
-            RoleAction::create($action);
+            RoleAction::updateOrCreate(
+                ['role' => $action['role'], 'key' => $action['key']],
+                $action
+            );
         }
     }
 }

@@ -3,10 +3,14 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
-class NewMessageNotification extends Notification implements ShouldQueue
+// NOT ShouldQueue: with QUEUE_CONNECTION=database and no worker running, a
+// queued notification never dispatches at all — neither the database row nor
+// the FCM push. Sending synchronously (the send is small and fail-soft in
+// FcmChannel) makes message notifications actually arrive, matching the case /
+// call / invite notifications which are already synchronous.
+class NewMessageNotification extends Notification
 {
     use Queueable;
 
@@ -19,7 +23,7 @@ class NewMessageNotification extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return ['database', 'broadcast']; 
+        return ['database', 'broadcast', \App\Notifications\Channels\FcmChannel::class];
     }
 
     public function toArray(object $notifiable): array

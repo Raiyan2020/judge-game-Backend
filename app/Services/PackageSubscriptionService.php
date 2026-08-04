@@ -38,6 +38,24 @@ class PackageSubscriptionService
             ]);
         }
 
+        // Reuse a RECENT still-pending subscription for the same package instead
+        // of minting another row + another live invoice — repeated taps would
+        // otherwise let the user be charged twice. Bounded to a short window: a
+        // MyFatoorah invoice URL expires, so reusing an old one would lock the
+        // user out of ever getting a fresh one. Only reuse when the terms match
+        // (same coupon), else fall through and create a fresh invoice.
+        $pending = \App\Models\PackageSubscription::where('user_id', auth()->id())
+            ->where('package_id', $package->id)
+            ->whereNull('payment_status')
+            ->whereNotNull('payment_url')
+            ->where('created_at', '>=', now()->subMinutes(30))
+            ->where('coupon_code', $data['coupon_code'] ?? null)
+            ->latest()
+            ->first();
+        if ($pending) {
+            return $pending->load('package');
+        }
+
         $userId = auth()->id();
         $coupon = null;
         $discount = 0;
@@ -53,6 +71,15 @@ class PackageSubscriptionService
         }
 
         $startsAt = now();
+        // A null/0 duration means `ends_at = null`, which `activeSubscription()`
+        // treats as NEVER expiring — one payment buys permanent access. Left as
+        // intended-lifetime behaviour, but logged so an accidentally-empty
+        // duration on a paid package is visible rather than silent.
+        if (empty($package->duration_days)) {
+            \Illuminate\Support\Facades\Log::warning(
+                'Package ' . $package->id . ' has no duration_days — subscription will never expire.'
+            );
+        }
         $endsAt = $package->duration_days
             ? now()->addDays($package->duration_days)
             : null;

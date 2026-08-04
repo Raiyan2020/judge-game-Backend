@@ -21,6 +21,12 @@ class DatabaseSeeder extends Seeder
         // screen has nothing to toggle. Idempotent (updateOrCreate by key).
         $this->call(PermissionSeeder::class);
 
+        // The achievement ladder: RoleActionSeeder first (the countable events),
+        // then RoleTitleSeeder (the rungs that reference them). Without these
+        // `GET /groups/{group}/achievements` returns [] and the screen is blank.
+        $this->call(RoleActionSeeder::class);
+        $this->call(RoleTitleSeeder::class);
+
         // User::factory(10)->create();
 
         User::factory()->create([

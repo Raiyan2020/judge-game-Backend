@@ -21,6 +21,10 @@ class GroupInvitationResource extends JsonResource
             'inviter_name' => $this->owner?->name ?? '',
             'role' => $this->pivot?->role,
             'members_count' => $this->members_count ?? 0,
+            // The invitation "About" card renders these; omitting them made the
+            // description body always blank and the cases chip always "0".
+            'description' => $this->description ?? '',
+            'cases_count' => $this->legal_cases_count ?? 0,
         ];
     }
 }

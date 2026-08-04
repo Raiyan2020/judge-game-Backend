@@ -21,6 +21,13 @@ class GroupLawService
         return $this->repo->getByGroup($groupId);
     }
 
+    // The owner enacts a law change directly; ANY OTHER MEMBER opens a poll and
+    // the group votes (a 24h majority-yes enacts it — see
+    // MessageService::resolveExpiredPolls). The vote IS the gate, so no per-role
+    // `add_laws`/`edit_law`/`delete_law` permission is required to PROPOSE —
+    // that permission was never seeded, which made every non-owner proposal
+    // 422 and left the whole poll mechanism unreachable.
+
     public function store(array $data)
     {
         $this->checkMembership($data['group_id']);
@@ -32,14 +39,6 @@ class GroupLawService
                 'reason' => $data['reason'] ?? null,
             ]);
         }
-        if (!$this->permissionService->hasPermission(
-            auth()->id(),
-            Group::findOrFail($data['group_id']),
-            'add_laws'
-        )) {
-            throw ValidationException::withMessages(['You are not authorized to create a law .']);
-        }
-
 
         return $this->createPoll($data, ChatPollType::CREATE_LAW->value);
     }
@@ -54,13 +53,6 @@ class GroupLawService
                 'reason' => $data['reason']
             ]);
         }
-        if (!$this->permissionService->hasPermission(   
-            auth()->id(),
-            Group::findOrFail($groupLaw->group_id),
-            'edit_law'
-        )) {
-            throw ValidationException::withMessages(['You are not authorized to update a law.']);
-        }
 
         return $this->createPoll(array_merge($data, ['group_law_id' => $groupLaw->id , 'group_id' => $groupLaw->group_id]), ChatPollType::UPDATE_LAW->value);
     }
@@ -72,21 +64,13 @@ class GroupLawService
         if ($this->isGroupOwner($groupLaw->group_id)) {
             return $this->repo->delete($groupLaw);
         }
-        if (!$this->permissionService->hasPermission(
-            auth()->id(),
-            Group::findOrFail($groupLaw->group_id),
-            'delete_law'
-        )) {
-            throw ValidationException::withMessages(['You are not authorized to delete a law.']);
-        }
 
         return $this->createPoll(array_merge($data, ['group_law_id' => $groupLaw->id , 'group_id' => $groupLaw->group_id]), ChatPollType::DELETE_LAW->value);
     }
 
     protected function createPoll(array $data, string $type)
     {
-
-        $this->messageService->createPoll($data, $type);
+        return $this->messageService->createPoll($data, $type);
     }
 
     protected function checkMembership($groupId)

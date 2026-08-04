@@ -26,11 +26,20 @@ class RoleAchievementRepository
 
     public function getRoleActions(string $role)
     {
-        return RoleAction::query()
-            ->whereIn('role', [
-                $role,
+        // Actions are seeded under CASE roles (plaintiff_lawyer/defendant_lawyer)
+        // but a group role is `lawyer` — without this mapping every lawyer action
+        // read empty. Judge/consultant/citizen already match their seeded key.
+        $roles = match ($role) {
+            GroupRole::LAWYER->value => [
+                CaseRole::PLAINTIFF_LAWYER->value,
+                CaseRole::DEFENDANT_LAWYER->value,
                 'all',
-            ])
+            ],
+            default => [$role, 'all'],
+        };
+
+        return RoleAction::query()
+            ->whereIn('role', $roles)
             ->get();
     }
 
@@ -44,6 +53,7 @@ class RoleAchievementRepository
             ->with([
                 'requirements.action',
             ])
+            ->orderBy('tier')
             ->get();
     }
 
@@ -83,12 +93,26 @@ class RoleAchievementRepository
                     $role
                 ),
 
-            // 'issue_judgment_instead_of_judge_case' =>
-            //     $this->countIssueJudgmentInsteadOfJudge(
-            //         $user,
-            //         $group,
-            //         $role
-            //     ),
+            'issue_judgment_instead_of_judge_case' =>
+                $this->countIssueJudgmentInsteadOfJudge(
+                    $user,
+                    $group,
+                    $role
+                ),
+
+            'file_lawsuit' =>
+                $this->countCaseParticipation(
+                    $user,
+                    $group,
+                    CaseRole::PLAINTIFF->value
+                ),
+
+            'lawsuit_filed_against' =>
+                $this->countCaseParticipation(
+                    $user,
+                    $group,
+                    CaseRole::DEFENDANT->value
+                ),
 
             'closed_without_judgment_case' =>
                 $this->countClosedWithoutJudgmentCase(
@@ -134,8 +158,12 @@ class RoleAchievementRepository
     ): array {
         return match ($groupRole) {
 
+            // A citizen participates as a plaintiff (files a suit) or a
+            // defendant (is sued) — never only a witness, which zeroed every
+            // citizen counter.
             GroupRole::CITIZEN->value => [
-                CaseRole::WITNESS->value,
+                CaseRole::PLAINTIFF->value,
+                CaseRole::DEFENDANT->value,
             ],
 
             GroupRole::LAWYER->value => [
@@ -323,20 +351,68 @@ class RoleAchievementRepository
         );
     }
 
+    /**
+     * Counts cases in [group] where [user] participates as [caseRole].
+     */
+    private function countCaseParticipation(
+        User $user,
+        Group $group,
+        string $caseRole
+    ): int {
+        return LegalCase::query()
+            ->where('group_id', $group->id)
+            ->whereHas('participants', function ($q) use ($user, $caseRole) {
+                $q->where('user_id', $user->id)->where('role', $caseRole);
+            })
+            ->count();
+    }
+
+    /**
+     * Restricts [query] to cases the user's SIDE won. `winner_id` holds the
+     * winning PRINCIPAL's id (a plaintiff or defendant user id) — never a
+     * lawyer's — so `where('winner_id', user->id)` counted a lawyer's wins as 0
+     * forever. This instead matches "the winner is the principal on the same
+     * side (plaintiff{,-lawyer} vs defendant{,-lawyer}) the user is on".
+     */
+    private function wonForUserSide($query, User $user)
+    {
+        return $query->where(function ($q) use ($user) {
+            // Plaintiff side won, and the user is on the plaintiff side.
+            $q->where(function ($q2) use ($user) {
+                $q2->whereHas('participants', function ($p) {
+                    $p->where('role', CaseRole::PLAINTIFF->value)
+                        ->whereColumn('legal_case_parties.user_id', 'legal_cases.winner_id');
+                })->whereHas('participants', function ($p) use ($user) {
+                    $p->where('user_id', $user->id)->whereIn('role', [
+                        CaseRole::PLAINTIFF->value,
+                        CaseRole::PLAINTIFF_LAWYER->value,
+                    ]);
+                });
+            })
+            // OR the defendant side won, and the user is on the defendant side.
+            ->orWhere(function ($q2) use ($user) {
+                $q2->whereHas('participants', function ($p) {
+                    $p->where('role', CaseRole::DEFENDANT->value)
+                        ->whereColumn('legal_case_parties.user_id', 'legal_cases.winner_id');
+                })->whereHas('participants', function ($p) use ($user) {
+                    $p->where('user_id', $user->id)->whereIn('role', [
+                        CaseRole::DEFENDANT->value,
+                        CaseRole::DEFENDANT_LAWYER->value,
+                    ]);
+                });
+            });
+        });
+    }
+
     private function countWinFirstInstanceCase(
         User $user,
         Group $group,
         string $role
     ): int {
-        return $this->baseCaseQuery(
-            $user,
-            $group,
-            $role
+        return $this->wonForUserSide(
+            $this->baseCaseQuery($user, $group, $role),
+            $user
         )
-            ->where(
-                'winner_id',
-                $user->id
-            )
             ->whereHas(
                 'firstInstanceJudgment'
             )
@@ -348,15 +424,10 @@ class RoleAchievementRepository
         Group $group,
         string $role
     ): int {
-        return $this->baseCaseQuery(
-            $user,
-            $group,
-            $role
+        return $this->wonForUserSide(
+            $this->baseCaseQuery($user, $group, $role),
+            $user
         )
-            ->where(
-                'winner_id',
-                $user->id
-            )
             ->whereHas(
                 'finalJudgment'
             )
@@ -390,15 +461,10 @@ class RoleAchievementRepository
         Group $group,
         string $role
     ): int {
-        return $this->baseCaseQuery(
-            $user,
-            $group,
-            $role
+        return $this->wonForUserSide(
+            $this->baseCaseQuery($user, $group, $role),
+            $user
         )
-            ->where(
-                'winner_id',
-                $user->id
-            )
             ->whereHas(
                 'judgments',
                 function ($query) {

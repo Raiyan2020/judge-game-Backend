@@ -36,7 +36,10 @@ class GroupRepository extends BaseRepository
         return $user->groups()
             ->wherePivot('status', 'pending')
             ->withPivot('role')
-            ->withCount('users as members_count')
+            ->withCount(['users as members_count' => function ($q) {
+                $q->where('group_user.status', 'accepted');
+            }])
+            ->withCount('legalCases')
             ->with('owner')
             ->get();
     }
@@ -49,7 +52,11 @@ class GroupRepository extends BaseRepository
         return $user->groups()
             ->wherePivot('status', 'accepted')
             ->withPivot('role', 'status')
-            ->withCount('users as members_count')
+            ->withCount(['users as members_count' => function ($q) {
+                // Only accepted members — a pending invite must NOT inflate the
+                // count shown on the group card (was 3 with a pending, list 2).
+                $q->where('group_user.status', 'accepted');
+            }])
             ->get();
     }
 

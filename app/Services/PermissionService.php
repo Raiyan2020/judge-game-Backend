@@ -14,7 +14,14 @@ class PermissionService
     {
         $permissions = $this->repo->getAllPermissions();
 
-        $groupPermissions = $this->repo->getGroupPermissions($groupId, $role);
+        // Individual editor (user_id set): reflect ONLY the per-user grants —
+        // that is exactly what the toggle writes (GroupUserPermission). Merging
+        // role grants here (via a null-role read that returned EVERY role's
+        // grants) showed permissions as ON that the toggle couldn't turn off,
+        // so the owner "couldn't make it take effect". Role editor: role grants.
+        $groupPermissions = $userId
+            ? []
+            : $this->repo->getGroupPermissions($groupId, $role);
 
         $userPermissions = $userId
             ? $this->repo->getUserPermissions($groupId, $userId)
@@ -25,9 +32,7 @@ class PermissionService
             $inGroup = in_array($permission->id, $groupPermissions);
             $inUser  = in_array($permission->id, $userPermissions);
 
-            $permission->has_permission = $userId
-                ? ($inUser || $inGroup)
-                : $inGroup;
+            $permission->has_permission = $userId ? $inUser : $inGroup;
         });
         $grouped = $permissions
             ->groupBy('group')

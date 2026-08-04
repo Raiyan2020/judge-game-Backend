@@ -139,6 +139,10 @@ class RoleAchievementService
                 return [
                     'id' => $title->id,
 
+                    'tier' => $title->tier,
+
+                    'reward_points' => $title->reward_points,
+
                     'title' => $title->title,
 
                     'requirements' =>
@@ -152,7 +156,10 @@ class RoleAchievementService
 
                     'used' => $usage['used'],
 
-                    'used_at' => $usage['used_at'] ? Carbon::parse($usage['used_at'])->format('Y-m-d') : null  ,
+                    // "used_at" is when the title was CLAIMED (the closest date
+                    // signal we store); may be null for a completed-but-unclaimed
+                    // rung — the app card tolerates null.
+                    'used_at' => $usage['used_at'] ? Carbon::parse($usage['used_at'])->format('d/m/Y') : null  ,
                 ];
             }
         );

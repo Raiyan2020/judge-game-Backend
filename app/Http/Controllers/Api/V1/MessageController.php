@@ -17,7 +17,13 @@ class MessageController extends Controller
     public function getGroupMessages(Group $group)
     {
         $messages = $this->messageService->index('group',$group);
-        return \responder::success(MessageResource::collection($messages));
+        // Also expose the group's chat id so the app can subscribe to the
+        // realtime channel even when the chat is EMPTY (no message to read it
+        // off) — otherwise a fresh group never receives live messages.
+        return \responder::success(
+            MessageResource::collection($messages),
+            ['chat_id' => $group->chat?->id]
+        );
     }
 
     public function getPrivateMessages()

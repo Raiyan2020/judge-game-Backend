@@ -47,7 +47,14 @@ class AuthService
         }
         
         $code = $this->createCode();
-        $this->repo->update($user, ['code' => $code, 'fcm_token' => $request['fcm_token']]);
+        // Only overwrite the FCM token when the request actually carries one —
+        // a login with an empty token must NOT null out a previously-good token
+        // (which would silently stop all push for that user).
+        $update = ['code' => $code];
+        if (!empty($request['fcm_token'])) {
+            $update['fcm_token'] = $request['fcm_token'];
+        }
+        $this->repo->update($user, $update);
         //whatsapp($user->country_code.$user->phone , $code.' Is Your activation code.');
     }
 

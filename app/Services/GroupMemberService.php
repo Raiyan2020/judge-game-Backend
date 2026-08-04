@@ -42,6 +42,15 @@ class GroupMemberService
        }
 
        if (!$user) {
+           // Distinct messages per lookup method — a generic "User not found"
+           // for both made a phone miss look like it searched the username
+           // field (and vice versa).
+           if (!empty($data['phone'])) {
+               throw ValidationException::withMessages([ __('No user found with this phone number.')]);
+           }
+           if (!empty($data['username'])) {
+               throw ValidationException::withMessages([ __('No user found with this username.')]);
+           }
            throw ValidationException::withMessages([ __('User not found.')]);
        }
 
@@ -111,6 +120,8 @@ class GroupMemberService
        $this->repo->updateGroupMemberStatus($group, $user, 'accepted');
        $group->chat?->users()->attach($user->id);
 
+       $this->notifyOwnerOfResponse($group, $user, true);
+
        return $user;
    }
 
@@ -124,7 +135,35 @@ class GroupMemberService
 
        $this->repo->removeGroupMember($group, $user);
 
+       $this->notifyOwnerOfResponse($group, $user, false);
+
        return true;
+   }
+
+   /**
+    * Tell the group owner (the inviter surrogate — the pivot stores no per-invite
+    * sender) that an invitation was accepted / rejected. Fail-soft: a
+    * notification error must never fail the accept/reject itself.
+    */
+   private function notifyOwnerOfResponse(Group $group, User $responder, bool $accepted): void
+   {
+       try {
+           $owner = $group->owner;
+           if (!$owner) {
+               return;
+           }
+           $owner->notify(new \App\Notifications\GroupInvitationResponseNotification($group, $responder, $accepted));
+
+           $verb = $accepted ? 'قبل دعوتك للانضمام إلى ' : 'رفض دعوتك للانضمام إلى ';
+           app(\App\Services\FcmService::class)->sendToToken(
+               $owner->fcm_token,
+               $group->name,
+               trim(($responder->name ?? '') . ' ' . $verb . $group->name),
+               ['type' => $accepted ? 'group_invite_accepted' : 'group_invite_rejected', 'id' => $group->id],
+           );
+       } catch (\Throwable $e) {
+           \Log::warning('Group invite response notification failed: ' . $e->getMessage());
+       }
    }
 
      public function leaveGroup($group)

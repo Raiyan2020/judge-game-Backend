@@ -58,6 +58,11 @@ class MessageService
     {
         $authId = auth('sanctum')->id();
         return Chat::query()
+            // The "chats" inbox is the PRIVATE (one-to-one) list only. Without
+            // this, group chats — which the user is always a member of — leaked
+            // in, so a group message showed up as a private chat and the
+            // `otherUser` picked an arbitrary group member as a bogus contact.
+            ->where('type', 'private')
             ->whereHas('users', function ($q) use ($authId) {
                 $q->where('user_id', $authId);
             })
@@ -154,7 +159,13 @@ class MessageService
             'attachment' => $data['attachment'] ?? null,
         ]);
 
-        broadcast(new MessageSent($message))->toOthers();
+        // Fail-soft: a broadcast error (e.g. misconfigured Pusher creds) must
+        // never fail the send itself — the message is already persisted.
+        try {
+            broadcast(new MessageSent($message))->toOthers();
+        } catch (\Throwable $e) {
+            \Log::warning('Broadcast MessageSent failed: ' . $e->getMessage());
+        }
 
         return $message;
     }

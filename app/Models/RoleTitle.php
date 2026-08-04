@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\Translatable\HasTranslations;
 
-#[Fillable(['role', 'title'])]
+#[Fillable(['role', 'tier', 'reward_points', 'title'])]
 
 class RoleTitle extends Model
 {

@@ -15,7 +15,11 @@ return [
     |
     */
 
-    'default' => env('BROADCAST_DRIVER', 'null'),
+    // Accept either key: `.env.example` documents BROADCAST_CONNECTION (Laravel
+    // 11 convention) while older envs use BROADCAST_DRIVER — reading only one
+    // meant a deployer setting the other silently stayed on the `null` driver
+    // and realtime never worked. Set to `pusher` (+ PUSHER_APP_* creds) in prod.
+    'default' => env('BROADCAST_CONNECTION', env('BROADCAST_DRIVER', 'null')),
 
     /*
     |--------------------------------------------------------------------------

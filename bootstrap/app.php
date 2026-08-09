@@ -50,7 +50,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->render(function (ValidationException $e, Request $request) {
             if ($request->expectsJson()) {
-                return \responder::error(\Arr::first(\Arr::first($e->errors())));
+                return \responder::error(\Illuminate\Support\Arr::first(\Illuminate\Support\Arr::first($e->errors())));
             }
 
         });

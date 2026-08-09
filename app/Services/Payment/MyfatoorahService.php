@@ -17,25 +17,37 @@ class MyfatoorahService
     public function getPaymentUrl(PackageSubscription $packageSubscription)
     {
         try {
+            $payload = [
+                'CustomerName' => $packageSubscription->user?->name ?? 'Customer',
+                'CustomerMobile' => $packageSubscription->user?->phone ?? '00000000',
+                'DisplayCurrencyIso' => 'KWD',
+                'InvoiceValue' =>  $packageSubscription->total,
+                'CallBackUrl' => route('payment.success'),
+                'ErrorUrl' => route('payment.error'),
+                'CustomerReference' => $packageSubscription->id,
+                'NotificationOption' => 'LNK',
+            ];
+
+            // We omit PaymentMethodId so MyFatoorah opens the standard gateway
+            // where the user can choose their preferred payment method normally.
+            // if ($packageSubscription->payment_method_id) {
+            //     $payload['PaymentMethodId'] = $packageSubscription->payment_method_id;
+            // }
+
             $http = Http::withToken(config('payment.mayfatoorah.token'))
-                ->post(config('payment.mayfatoorah.url') . '/SendPayment', [
-                    'CustomerName' => $packageSubscription->user?->name,
-                    'CustomerMobile' => $packageSubscription->user?->phone,
-                    'InvoiceValue' =>  $packageSubscription->total,
-                    'CallBackUrl' => route('payment.success'),
-                    'Errorurl' => route('payment.error'),
-                    'CustomerReference' => $packageSubscription->id,
-                    'PaymentMethodId' => $packageSubscription->payment_method_id ?? 1,
-                    'NotificationOption' => 'LNK',
-                ]);
+                ->post(config('payment.mayfatoorah.url') . '/SendPayment', $payload);
 
             $data = $http->json();
 
-            // Persist the invoice id so the `subscriptions:reconcile` command can
-            // map an unpaid row back to its invoice. NON-FATAL: if the migration
-            // that adds the column hasn't run yet, payment must still work — the
-            // webhook + redirect paid-flip don't depend on this column (they use
-            // the CustomerReference the API returns), only reconcile does.
+            if (empty($data['IsSuccess']) || $data['IsSuccess'] === false) {
+                $errorMsg = $data['Message'] ?? 'Unknown MyFatoorah Error';
+                if (!empty($data['ValidationErrors'])) {
+                    $errorMsg .= ' - ' . json_encode($data['ValidationErrors']);
+                }
+                Log::error('MyFatoorah Error: ' . $errorMsg);
+                throw new \Exception($errorMsg);
+            }
+
             $invoiceId = $data['Data']['InvoiceId'] ?? null;
             if ($invoiceId) {
                 try {
@@ -45,11 +57,10 @@ class MyfatoorahService
                 }
             }
 
-            return $data['Data']['InvoiceURL'];
+            return $data['Data']['InvoiceURL'] ?? null;
         } catch (\Exception $e) {
             throw ValidationException::withMessages([
-                'payment' => __('error in payment gateway'),
-                'message' => $e->getMessage(),
+                'payment' => $e->getMessage(),
             ]);
         }
     }

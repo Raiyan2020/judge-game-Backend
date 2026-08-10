@@ -27,6 +27,8 @@ use App\Http\Controllers\Api\V1\SettingController;
 use App\Http\Controllers\Api\V1\UserRankController;
 use App\Http\Controllers\Api\V1\UserStatisticsController;
 use App\Http\Controllers\Payment\WebhookController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
 
 Route::group(['middleware' => 'setLocale'], function () {
@@ -38,6 +40,15 @@ Route::group(['middleware' => 'setLocale'], function () {
     });
 
     Route::group(['middleware' => 'auth:sanctum'], function () {
+        // Pusher private-channel authorization. Laravel's default
+        // `/broadcasting/auth` route sits at the site ROOT on `web`/session
+        // middleware — unreachable behind this deployment (only `/api/*` is
+        // proxied to Laravel) and it 403s a Sanctum bearer anyway. Re-expose it
+        // here so it lives at `/api/broadcasting/auth`, is proxied, and
+        // authenticates via the bearer token. `Broadcast::auth()` runs the
+        // channel callbacks in routes/channels.php and signs the response.
+        Route::post('broadcasting/auth', fn (Request $request) => Broadcast::auth($request));
+
         Route::group(['prefix' => 'auth'], function () {
             Route::get('profile', [ProfileController::class, 'show']);
             Route::post('profile', [ProfileController::class, 'update']);

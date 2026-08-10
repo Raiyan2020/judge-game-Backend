@@ -42,6 +42,12 @@
         }
     },
     "scripts": {
+        "deploy": [
+            "@php artisan migrate --force",
+            "@php artisan app:seed-reference-data",
+            "@php artisan config:clear",
+            "@php artisan route:clear"
+        ],
         "setup": [
             "composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",

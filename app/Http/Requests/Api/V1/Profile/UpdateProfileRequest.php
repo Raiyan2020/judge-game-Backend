@@ -18,9 +18,16 @@ class UpdateProfileRequest extends FormRequest
         return [
             'name' => 'sometimes|string|max:255',
             'country_code' => 'sometimes|numeric',
-            'phone' => ['required', Rule::unique('users')->where(function ($query) {
-                $query->where('country_code', $this->country_code)->where('phone', $this->phone)->where('id', '!=', $this->user()->id);
-            })],
+            // `phone` is accepted but NOT applied — see UserService::updateProfile.
+            // Changing the number here proved no ownership of it: a typo locked
+            // the user out of their own account permanently (login is by phone),
+            // and an unregistered number belonging to someone else could be
+            // claimed. It now moves only through the verified two-step flow
+            // (`/auth/phone-change/request` → `/confirm`).
+            //
+            // Kept as a rule rather than dropped so existing app builds, which
+            // always send it, keep validating instead of 422-ing.
+            'phone' => ['sometimes'],
             'status' => ['sometimes', 'string', new Enum(\App\Enums\UserStatus::class)],
             'image' => 'sometimes|image|max:2048',
             'country_id' => 'sometimes|exists:countries,id',

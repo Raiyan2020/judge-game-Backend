@@ -11,6 +11,12 @@ class UserService
 
     public function updateProfile($user, array $data)
     {
+        // The login identity is never edited through the profile form. Both
+        // fields are dropped even when a client sends them: the phone moves
+        // only through the verified `/auth/phone-change/*` flow, and
+        // `country_code` is half of that same identity.
+        unset($data['phone'], $data['country_code']);
+
         return $this->repo->update($user, $data);
     }
 

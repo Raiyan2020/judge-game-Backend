@@ -4,14 +4,16 @@ namespace Database\Seeders;
 
 use App\Enums\UserStatus;
 use App\Models\Group;
+use App\Models\GroupLaw;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
 /**
  * Test-data seeder: fills every group (or a chosen set) with a role-diverse
- * roster of ACCEPTED members, so the full case cycle can be played freely —
- * filing needs ≥2 citizens and lawyers on both sides, a consultant advises the
- * judge, and the group owner is already the judge.
+ * roster of ACCEPTED members PLUS a set of group laws, so the full case cycle
+ * can be played freely — filing needs ≥2 citizens, lawyers on both sides, a
+ * consultant to advise the judge, and at least one law to charge the defendant
+ * with. The group owner is already the judge.
  *
  * Standalone and opt-in (NOT wired into DatabaseSeeder — you don't want fake
  * members on every production seed). Run with:
@@ -41,6 +43,22 @@ class GroupMembersSeeder extends Seeder
         'consultant' => 1,
         'lawyer' => 3,
         'citizen' => 5,
+    ];
+
+    /**
+     * The laws (القوانين) added to every target group. `description` is the law
+     * text shown in the "القوانين المخالفة" picker; `reason` is its rationale.
+     * The filer must select at least one, so a group needs laws to file at all.
+     *
+     * @var array<array{description:string,reason:string}>
+     */
+    private const LAWS = [
+        ['description' => 'التأخر عن الجلسة دون عذر مقبول', 'reason' => 'الإخلال بمواعيد المحكمة يعطّل سير العدالة'],
+        ['description' => 'الإدلاء بشهادة زور أمام المحكمة', 'reason' => 'الكذب على القضاء جريمة تقوّض الثقة في الأحكام'],
+        ['description' => 'إهانة أحد أطراف الدعوى', 'reason' => 'حفظ كرامة المتقاضين وهيبة الجلسة'],
+        ['description' => 'الإخلال بالنظام العام داخل المجموعة', 'reason' => 'الحفاظ على انضباط المجتمع'],
+        ['description' => 'التهرب من تنفيذ حكم قضائي', 'reason' => 'الأحكام مُلزِمة ويجب تنفيذها'],
+        ['description' => 'نشر معلومات كاذبة عن عضو', 'reason' => 'حماية السمعة من التشهير'],
     ];
 
     /**
@@ -90,7 +108,11 @@ class GroupMembersSeeder extends Seeder
                 }
             }
 
-            $this->command?->info("Populated group #{$group->id} ({$group->name}).");
+            $lawsAdded = $this->seedLaws($group);
+
+            $this->command?->info(
+                "Populated group #{$group->id} ({$group->name}) — {$lawsAdded} laws present."
+            );
         }
 
         $this->command?->table(
@@ -101,6 +123,22 @@ class GroupMembersSeeder extends Seeder
             'Seeded members can sign in with the phone above + OTP ' .
             config('auth.static_otp', '1234') . '.'
         );
+    }
+
+    /**
+     * Add [LAWS] to a group, idempotently. Keyed by (group_id, description) so a
+     * re-run neither duplicates a law nor overwrites one edited in-app. Returns
+     * the total number of laws the group now has from this set.
+     */
+    private function seedLaws(Group $group): int
+    {
+        foreach (self::LAWS as $law) {
+            GroupLaw::firstOrCreate(
+                ['group_id' => $group->id, 'description' => $law['description']],
+                ['reason' => $law['reason']],
+            );
+        }
+        return count(self::LAWS);
     }
 
     /**

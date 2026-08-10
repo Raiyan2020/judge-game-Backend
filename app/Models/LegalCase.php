@@ -99,4 +99,9 @@ class LegalCase extends Model implements HasMedia
     {
         return $this->hasMany(LegalCaseNews::class);
     }
+
+    public function hearings()
+    {
+        return $this->hasMany(Hearing::class)->orderBy('scheduled_at');
+    }
 }

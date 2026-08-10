@@ -39,6 +39,98 @@ class LegalCaseService
         $legalCase->refresh();
     }
 
+    /**
+     * Manually close a case in execution — the "إغلاق الحكم نهائيًا" action.
+     * Previously there was no endpoint at all: the app button only opened a
+     * "Coming Soon" placeholder, and closure happened solely on the lazy 7-day
+     * timer. This lets the judge (or a party) close it immediately once the
+     * final judgment is in.
+     */
+    public function closeCase($legalCase)
+    {
+        $userId = auth()->id();
+
+        // Only the presiding judge (group owner) or a party to the case.
+        $isJudge = $legalCase->group && (int) $legalCase->group->user_id === (int) $userId;
+        $isParticipant = $legalCase->participants()->where('user_id', $userId)->exists();
+        if (! $isJudge && ! $isParticipant) {
+            throw ValidationException::withMessages([__('You are not authorized to perform this action')]);
+        }
+
+        // Closable only in execution AND once a final judgment exists — there is
+        // nothing to close before enforcement begins.
+        if ($legalCase->status !== LegalCaseStatus::EXECUTION->value) {
+            throw ValidationException::withMessages([__('The case cannot be closed at this stage')]);
+        }
+        if (! $legalCase->finalJudgment()->exists()) {
+            throw ValidationException::withMessages([__('The case cannot be closed before a final judgment is issued')]);
+        }
+
+        $legalCase->update(['status' => LegalCaseStatus::CLOSED->value]);
+        $legalCase->refresh();
+
+        return $legalCase;
+    }
+
+    /**
+     * Schedule a hearing for a case — the "تحديد جلسة" action, which previously
+     * had no backend at all. Only the presiding judge or a party may schedule.
+     * All parties are notified.
+     */
+    public function scheduleHearing($legalCase, array $data)
+    {
+        $userId = auth()->id();
+
+        $isJudge = $legalCase->group && (int) $legalCase->group->user_id === (int) $userId;
+        $isParticipant = $legalCase->participants()->where('user_id', $userId)->exists();
+        if (! $isJudge && ! $isParticipant) {
+            throw ValidationException::withMessages([__('You are not authorized to perform this action')]);
+        }
+
+        $hearing = $legalCase->hearings()->create([
+            'room_id' => $data['room_id'] ?? null,
+            'created_by' => $userId,
+            'scheduled_at' => $data['scheduled_at'],
+            'status' => 'scheduled',
+        ]);
+
+        // No transaction here, so notify inline (try/catch so a failed FCM/DB
+        // notification never fails the scheduling itself).
+        try {
+            $this->notifyPartiesOnHearing($legalCase, $hearing);
+        } catch (\Throwable $e) {
+            logger()->warning('Hearing notification failed: ' . $e->getMessage());
+        }
+
+        return $hearing;
+    }
+
+    public function listHearings($legalCase)
+    {
+        return $legalCase->hearings()->get();
+    }
+
+    private function notifyPartiesOnHearing($legalCase, $hearing): void
+    {
+        $userIds = $legalCase->participants()->pluck('user_id')->unique()->filter();
+        if ($userIds->isEmpty()) {
+            return;
+        }
+        $users = User::whereIn('id', $userIds)->get();
+        Notification::send($users, new LegalCaseNotification($legalCase, [
+            'model_id' => $legalCase->id,
+            'title' => [
+                'ar' => 'موعد جلسة جديد',
+                'en' => 'New hearing scheduled',
+            ],
+            'body' => [
+                'ar' => 'تم تحديد موعد جلسة للقضية رقم ' . $legalCase->id,
+                'en' => 'A hearing has been scheduled for case #' . $legalCase->id,
+            ],
+            'type' => 'hearing_scheduled',
+        ]));
+    }
+
 
     public function create($request)
     {

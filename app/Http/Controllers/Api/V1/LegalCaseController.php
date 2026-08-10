@@ -25,8 +25,43 @@ class LegalCaseController extends Controller
 
     public function getCaseStatus(Request $request)
     {
+        // `group_id` is REQUIRED: the repository treats a null one as "no
+        // filter", so omitting it returned case counters for the entire
+        // database. And it must be a group the caller belongs to, or these
+        // counters report on groups they cannot otherwise see.
+        $request->validate(['group_id' => 'required|exists:groups,id']);
+        $this->ensureGroupMember((int) $request->group_id);
+
         $legalCases = $this->legalCaseService->getCasesStatus($request->group_id);
         return \responder::success($legalCases);
+    }
+
+    /**
+     * Refuses a caller who is not an accepted member (or the owner) of [$groupId].
+     *
+     * The `groupMember` middleware cannot be used on these routes: it reads the
+     * `{group}` route parameter, which `show` (`{legalCase}`) and
+     * `getCaseStatus` (query string) do not have — it would deny everyone.
+     */
+    private function ensureGroupMember(int $groupId): void
+    {
+        $userId = auth('sanctum')->id();
+
+        $allowed = \App\Models\Group::whereKey($groupId)
+            ->where(function ($query) use ($userId) {
+                $query->where('user_id', $userId)
+                    ->orWhereHas('users', function ($q) use ($userId) {
+                        $q->where('users.id', $userId)
+                            ->where('group_user.status', 'accepted');
+                    });
+            })
+            ->exists();
+
+        if (! $allowed) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'group' => __('You are not a member of this group'),
+            ]);
+        }
     }
 
     public function store(LegalCaseRequest $request)
@@ -39,6 +74,13 @@ class LegalCaseController extends Controller
 
     public function show(LegalCase $legalCase)
     {
+        // Authenticated-IDOR guard: this route takes a case id, not a group id,
+        // so it carried no membership check at all — any signed-in user could
+        // read ANY case by number, including every party, the full opinions
+        // with their `legal_arguments`, and the judgment texts. Membership in
+        // the case's own group is the minimum bar.
+        $this->ensureGroupMember((int) $legalCase->group_id);
+
         // A case that finished its enforcement window should read as `closed`.
         $this->legalCaseService->settleIfExecutionExpired($legalCase);
         $legalCase->load($this->relations());
@@ -48,6 +90,13 @@ class LegalCaseController extends Controller
     public function assignDefendantLawyer(AssignDefendantLawyerRequest $request)
     {
         $legalCase = $this->legalCaseService->assignDefendantLawyer($request->validated());
+        $legalCase->load($this->relations());
+        return \responder::success(new LegalCaseResource($legalCase));
+    }
+
+    public function close(LegalCase $legalCase)
+    {
+        $legalCase = $this->legalCaseService->closeCase($legalCase);
         $legalCase->load($this->relations());
         return \responder::success(new LegalCaseResource($legalCase));
     }

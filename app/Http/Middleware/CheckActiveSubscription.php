@@ -25,6 +25,12 @@ class CheckActiveSubscription
         $activeSubscription = $user->activeSubscription()->with('package')->first();
 
         if (!$activeSubscription) {
+            // Diagnostic for the "rejected despite paying" report (row 57): the
+            // gate logic is correct, so a wrong rejection means the account's
+            // rows are not `payment_status = paid` (the paid-flip didn't run).
+            // Logs the statuses so that can be confirmed on the live server.
+            logger()->info('Subscription gate rejected user ' . $user->id . ' — statuses: ' . $user->subscriptions()->pluck('payment_status')->implode(','));
+
             // HTTP 402 Payment Required — a distinct status (not a generic 422)
             // so the app can tell "you need a subscription" from ordinary input
             // errors and route the user to the packages screen. `error_code`

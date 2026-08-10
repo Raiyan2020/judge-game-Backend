@@ -19,7 +19,12 @@ class UserResource extends JsonResource
         // the app only ever sends a phone (to invite someone), it never reads
         // one off a member. Exposing it here meant any member list — and those
         // were readable by any signed-in user — doubled as a phone directory.
-        $isSelf = auth('sanctum')->id() === $this->id;
+        // "Carries a token" counts as self: `POST /auth/verify-code` is
+        // UNAUTHENTICATED (the token is minted inside that very request), so
+        // `auth('sanctum')->id()` is null there — and `when(false)` REMOVES the
+        // key rather than nulling it, which would have stripped the phone out
+        // of the one response the app builds its session from.
+        $isSelf = $this->token !== null || auth('sanctum')->id() === $this->id;
 
         return [
             'id' => $this->id,

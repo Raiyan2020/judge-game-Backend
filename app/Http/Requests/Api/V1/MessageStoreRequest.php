@@ -29,7 +29,16 @@ class MessageStoreRequest extends FormRequest
             // frontend. The allow-list is the set the app can actually render
             // (image / voice / document), and `max` caps an otherwise
             // unbounded upload.
-            'attachment' => 'nullable|file|mimes:jpg,jpeg,png,gif,webp,mp3,m4a,wav,aac,ogg,mp4,pdf|max:10240',
+            // The allow-list mirrors ChatAttachmentPolicy in the app
+            // (image / document / audio sets, including HEIC from iPhone
+            // cameras) so nothing the client already permits is refused here —
+            // a rule that breaks a working upload would be a worse bug than the
+            // one it closes. What it excludes is what makes the upload
+            // dangerous: `html`, `htm`, `svg`, `xml` and scripts. Uploads land
+            // on the PUBLIC disk with a sniffed extension, so those would be
+            // served back as active content from this app's own origin
+            // (stored XSS). `max` caps an otherwise unbounded upload.
+            'attachment' => 'nullable|file|mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf,doc,docx,txt,mp3,m4a,wav,aac,ogg,mp4,mov|max:10240',
         ];
     }
 }

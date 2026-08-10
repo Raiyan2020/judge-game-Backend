@@ -136,6 +136,8 @@
     "Only citizens can create legal cases":"المواطنون فقط هم من يمكنهم رفع القضايا.",
     "The defendant must be a citizen of the group":"يجب أن يكون المدعى عليه مواطنًا في المجموعة.",
     "You have already submitted your opinion for this case":"لقد قدّمت رأيك في هذه القضية بالفعل.",
+    "The case cannot be closed at this stage":"لا يمكن إغلاق القضية في هذه المرحلة.",
+    "The case cannot be closed before a final judgment is issued":"لا يمكن إغلاق القضية قبل صدور حكم نهائي.",
     "Group not found":"المجموعة غير موجودة.",
     "Legal case not found":"القضية غير موجودة.",
     "You must be a member of the group to create a legal case":"يجب أن تكون عضوًا في المجموعة لإنشاء قضية.",

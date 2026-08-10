@@ -119,6 +119,16 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::post('rooms/{room}/join', [RoomController::class, 'join']);
         Route::post('rooms/{room}/leave', [RoomController::class, 'leave']);
         Route::post('rooms/{room}/toggle-mute', [RoomController::class, 'toggleMute']);
+        // Hearings for a case (schedule / list). Judge or a party only — not
+        // subscription-gated (coordination, not a paid judicial action).
+        Route::get('legal-cases/{legalCase}/hearings', [\App\Http\Controllers\Api\V1\HearingController::class, 'index']);
+        Route::post('legal-cases/{legalCase}/hearings', [\App\Http\Controllers\Api\V1\HearingController::class, 'store']);
+
+        // Manually close a case that is in execution with a final judgment. Not
+        // subscription-gated: finishing a case you are already party to should
+        // never be blocked by a lapsed subscription.
+        Route::post('legal-cases/{legalCase}/close', [LegalCaseController::class, 'close']);
+
         Route::group(['middleware' => 'checkActiveSubscription'], function () {
             Route::post('legal-cases', [LegalCaseController::class, 'store']);
             Route::post('assign-lawyer', [LegalCaseController::class, 'assignDefendantLawyer']);

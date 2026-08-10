@@ -150,9 +150,10 @@ class LegalCaseService
                     // A defendant must be a CITIZEN of the group — a judge,
                     // lawyer or consultant is never the accused. The request only
                     // validates `exists:users,id`, so this is the real gate
-                    // (the app filters the picker to citizens too).
+                    // (the app filters the picker to citizens too). Status-agnostic
+                    // on purpose: a non-`accepted` status value must not turn a
+                    // legitimate citizen defendant into a false rejection.
                     $defendantRole = $group->users()
-                        ->wherePivot('status', 'accepted')
                         ->where('user_id', $participant['user_id'])
                         ->first()?->pivot?->role;
                     if ($defendantRole !== GroupRole::CITIZEN->value) {
@@ -224,10 +225,12 @@ class LegalCaseService
     {
         $userId = auth()->id();
 
-        // Only ACCEPTED members count: a still-pending invitee is neither a real
-        // member for the membership check nor a warm body toward the minimum
-        // head-count. (`assignDefendantLawyer` already scopes the same way.)
-        $membersQuery = $group->users()->wherePivot('status', 'accepted');
+        // Membership + creator-role are checked status-agnostically, exactly as
+        // before — narrowing them to `accepted` here could newly BREAK filing
+        // for a real creator if any live membership row carries a status other
+        // than the literal `accepted`. (Verify with the group_user status query
+        // in the deploy checklist.)
+        $membersQuery = $group->users();
 
         $creator = (clone $membersQuery)
             ->where('user_id', $userId)
@@ -248,11 +251,16 @@ class LegalCaseService
             ]);
         }
 
-        $lawyersCount = (clone $membersQuery)
+        // The minimum head-count counts ACCEPTED members only — the actual row-62
+        // fix: a still-pending invitee is not yet a warm body for a fair case.
+        // (`assignDefendantLawyer` already scopes counts the same way.)
+        $acceptedQuery = (clone $membersQuery)->wherePivot('status', 'accepted');
+
+        $lawyersCount = (clone $acceptedQuery)
             ->wherePivot('role', GroupRole::LAWYER->value)
             ->count();
 
-        $citizensCount = (clone $membersQuery)
+        $citizensCount = (clone $acceptedQuery)
             ->wherePivot('role', GroupRole::CITIZEN->value)
             ->count();
 

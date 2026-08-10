@@ -159,4 +159,7 @@ Route::group(['middleware' => 'setLocale'], function () {
     Route::get('setting-pages', [SettingController::class, 'getSettingsPages']);
     Route::get('setting-laws', [SettingController::class, 'getSettingsLaws']);
     Route::get('users-ranking', [UserRankController::class, 'index']);
+    // The leaderboard detail sheet. Public like the board it belongs to, and
+    // registered AFTER the index so the literal path wins over the wildcard.
+    Route::get('users-ranking/{user}', [UserRankController::class, 'show']);
 });

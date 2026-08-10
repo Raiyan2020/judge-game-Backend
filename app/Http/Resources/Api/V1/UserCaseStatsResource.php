@@ -21,14 +21,15 @@ class UserCaseStatsResource extends JsonResource
             'name' => $this->name,
             'image' => $this->image,
             'country_image' => $this->country?->image,
+            // `participated_cases`, not `participated_judges`: the app reads the
+            // former (with the latter only as a legacy fallback), and this
+            // default used to disagree with every producer of the value.
             'case_stats' => $this->case_stats ?? [
-                'participated_judges' => 0,
+                'participated_cases' => 0,
                 'appeal_judgments' => 0,
                 'acquittal_judgments' => 0,
                 'first_instance_judgments' => 0,
             ],
-
-         
         ];
     }
 }

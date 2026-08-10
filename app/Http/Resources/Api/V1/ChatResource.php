@@ -17,7 +17,10 @@ class ChatResource extends JsonResource
                 'id' => $user?->id,
                 'name' => $user?->name,
                 'image' => $user?->image,
-                'is_online' => (bool) $user?->status === 'online',
+                // NOT `(bool) $user?->status === 'online'`: the cast binds
+                // tighter than `===`, so that compared a bool to a string and
+                // was false for everyone, always.
+                'is_online' => $user?->status === 'online',
             ],
 
             'last_message' => [

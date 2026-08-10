@@ -132,6 +132,10 @@
     "A defendant lawyer is already assigned to this case":"تم تعيين محامي دفاع لهذه القضية بالفعل.",
     "The case is no longer open for assigning a lawyer":"القضية لم تعد مفتوحة لتعيين محامٍ.",
     "The selected lawyer is not a lawyer in this group":"الشخص المختار ليس محاميًا في هذه المجموعة.",
+    "The plaintiff lawyer cannot also defend the defendant":"لا يمكن أن يكون محامي المدعي هو نفسه محامي المدعى عليه.",
+    "Only citizens can create legal cases":"المواطنون فقط هم من يمكنهم رفع القضايا.",
+    "The defendant must be a citizen of the group":"يجب أن يكون المدعى عليه مواطنًا في المجموعة.",
+    "You have already submitted your opinion for this case":"لقد قدّمت رأيك في هذه القضية بالفعل.",
     "Group not found":"المجموعة غير موجودة.",
     "Legal case not found":"القضية غير موجودة.",
     "You must be a member of the group to create a legal case":"يجب أن تكون عضوًا في المجموعة لإنشاء قضية.",
@@ -162,7 +166,7 @@
     "Failed to reject invitation.":"فشل في رفض الدعوة.",
     "Law deleted successfully":"تم حذف القانون بنجاح",
     "Law created successfully":"تم إنشاء القانون بنجاح",
-    "request submitted and pending now":"تم تقديم طلبك وهو قيد الانتظار ",
+    "request submitted and pending approval":"تم تقديم طلبك وهو قيد الانتظار ",
     "Law updated successfully":"تم تحديث القانون بنجاح",
     "Law delete successfully":"تم حذف القانون بنجاح",
     "Ad created successfully":"تم إنشاء الإعلان بنجاح",
@@ -216,7 +220,11 @@
      "ongoing":"جارية",
      "appeal":"استئناف",
      "execution":"قيد التنفيذ",
-     "closed":"مغلقة"
-
-   
+     "closed":"مغلقة",
+    "The group owner cannot leave the group": "لا يمكن لمالك المجموعة مغادرتها.",
+    "The group owner cannot be removed from the group": "لا يمكن إزالة مالك المجموعة من المجموعة.",
+    "You are not authorized to change the group name.": "ليست لديك صلاحية تغيير اسم المجموعة.",
+    "You are not authorized to remove members from the group.": "ليست لديك صلاحية إزالة أعضاء من المجموعة.",
+    "Role changed successfully": "تم تغيير الدور بنجاح",
+    "Member removed successfully": "تمت إزالة العضو بنجاح"
 }

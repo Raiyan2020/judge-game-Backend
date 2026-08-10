@@ -55,6 +55,17 @@ class LegalCaseService
             $this->validateUserCanCreateCase($group);
             foreach ($participants as $participant) {
                 if ($participant['role'] == 'defendant') {
+                    // A defendant must be a CITIZEN of the group — a judge,
+                    // lawyer or consultant is never the accused. The request only
+                    // validates `exists:users,id`, so this is the real gate
+                    // (the app filters the picker to citizens too).
+                    $defendantRole = $group->users()
+                        ->wherePivot('status', 'accepted')
+                        ->where('user_id', $participant['user_id'])
+                        ->first()?->pivot?->role;
+                    if ($defendantRole !== GroupRole::CITIZEN->value) {
+                        throw ValidationException::withMessages([__('The defendant must be a citizen of the group')]);
+                    }
                     if ($this->groupPermissionService->hasPermission($participant['user_id'], $group, 'lawsuit_immunity')) {
                         throw ValidationException::withMessages([__('The defendant has immunity against lawsuits')]);
                     }
@@ -79,10 +90,16 @@ class LegalCaseService
 
             // Register BEFORE committing so the callback fires AFTER the real
             // commit. Called after `DB::commit()` (no active transaction) it
-            // runs synchronously, and a notification throw would then roll back
-            // an already-committed case → a 500 for a case that was created.
-            DB::afterCommit(function () use ($legalCase) {
-                $this->sendNotificationToPlaintiffLawyer($legalCase);
+            // runs synchronously (no queue worker here), so any throw would
+            // propagate out of create() and 500 an already-committed case. The
+            // try/catch keeps a failed notification from doing that.
+            DB::afterCommit(function () use ($legalCase, $group, $participants) {
+                try {
+                    $this->sendNotificationToPlaintiffLawyer($legalCase);
+                    $this->sendCaseFiledNotifications($legalCase, $group, $participants);
+                } catch (\Throwable $e) {
+                    logger()->warning('Case-filed notification failed: ' . $e->getMessage());
+                }
             });
 
             DB::commit();
@@ -115,26 +132,27 @@ class LegalCaseService
     {
         $userId = auth()->id();
 
-        $membersQuery = $group->users();
+        // Only ACCEPTED members count: a still-pending invitee is neither a real
+        // member for the membership check nor a warm body toward the minimum
+        // head-count. (`assignDefendantLawyer` already scopes the same way.)
+        $membersQuery = $group->users()->wherePivot('status', 'accepted');
 
-        $isMember = (clone $membersQuery)
+        $creator = (clone $membersQuery)
             ->where('user_id', $userId)
-            ->exists();
+            ->first();
 
-        if (!$isMember) {
+        if (!$creator) {
             throw ValidationException::withMessages([
                 __('You must be a member of the group to create a legal case')
             ]);
         }
 
-        $isJudge = (clone $membersQuery)
-            ->where('user_id', $userId)
-            ->wherePivot('role', GroupRole::JUDGE->value)
-            ->exists();
-
-        if ($isJudge) {
+        // Only citizens file cases. A judge, lawyer or consultant is a court
+        // officer, never a plaintiff — this replaces the judge-only block, which
+        // let lawyers and consultants through. The app gates this too.
+        if ($creator->pivot->role !== GroupRole::CITIZEN->value) {
             throw ValidationException::withMessages([
-                __('Group judge cannot create legal cases')
+                __('Only citizens can create legal cases')
             ]);
         }
 
@@ -233,6 +251,17 @@ class LegalCaseService
             throw ValidationException::withMessages([__('The selected lawyer is not a lawyer in this group')]);
         }
 
+        // The same lawyer cannot represent both sides — a conflict of interest.
+        // The app hides the plaintiff's lawyer from the picker, but the request
+        // only validates `exists`, so this is the enforcing gate.
+        $plaintiffLawyerId = $case->participants()
+            ->where('role', CaseRole::PLAINTIFF_LAWYER->value)
+            ->value('user_id');
+
+        if ($plaintiffLawyerId !== null && (int) $plaintiffLawyerId === (int) $request['lawyer_id']) {
+            throw ValidationException::withMessages([__('The plaintiff lawyer cannot also defend the defendant')]);
+        }
+
         $case->participants()->create([
             'user_id' => $request['lawyer_id'],
             'role' => CaseRole::DEFENDANT_LAWYER->value,
@@ -258,6 +287,58 @@ class LegalCaseService
                 'type' => 'new_legal_case',
             ];
             Notification::send($plaintiffLawyer->user, new LegalCaseNotification($legalCase, $data));
+        }
+    }
+
+    /**
+     * Notify the two parties a filing must reach but previously did not: the
+     * DEFENDANT (a case was filed against them) and the group's JUDGE (a case
+     * was filed in their court). Only the plaintiff lawyer was ever notified.
+     * The defendant id is read from the participants array; the judge is the
+     * group owner (attached as the `judge` participant via `$group->user_id`).
+     */
+    private function sendCaseFiledNotifications($legalCase, $group, array $participants): void
+    {
+        $defendantId = null;
+        foreach ($participants as $participant) {
+            if (($participant['role'] ?? null) === 'defendant') {
+                $defendantId = $participant['user_id'];
+                break;
+            }
+        }
+
+        if ($defendantId) {
+            $defendant = User::find($defendantId);
+            if ($defendant) {
+                Notification::send($defendant, new LegalCaseNotification($legalCase, [
+                    'model_id' => $legalCase->id,
+                    'title' => [
+                        'ar' => 'قضية جديدة مرفوعة ضدك',
+                        'en' => 'A new case filed against you',
+                    ],
+                    'body' => [
+                        'ar' => 'تم رفع قضية جديدة ضدك برقم ' . $legalCase->id,
+                        'en' => 'A new case (#' . $legalCase->id . ') has been filed against you',
+                    ],
+                    'type' => 'case_filed_against_you',
+                ]));
+            }
+        }
+
+        $judge = User::find($group->user_id);
+        if ($judge) {
+            Notification::send($judge, new LegalCaseNotification($legalCase, [
+                'model_id' => $legalCase->id,
+                'title' => [
+                    'ar' => 'قضية جديدة في مجموعتك',
+                    'en' => 'New case in your group',
+                ],
+                'body' => [
+                    'ar' => 'تم رفع قضية جديدة برقم ' . $legalCase->id . ' في مجموعتك',
+                    'en' => 'A new case (#' . $legalCase->id . ') was filed in your group',
+                ],
+                'type' => 'case_filed_in_group',
+            ]));
         }
     }
 

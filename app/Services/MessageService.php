@@ -97,9 +97,17 @@ class MessageService
             return;
         }
 
-        $isMember = $group->chat->users()
-            ->where('user_id', $user->id)
-            ->exists();
+        // Null-safe on the chat: every group created through the app gets one
+        // (GroupRepository::createGroupWithJudge), but a group made any other
+        // way has none, and `$group->chat->users()` would then be a 500 rather
+        // than a refusal. Fall back to the group pivot, which is the real
+        // membership record — accepting an invitation writes both.
+        $isMember = $group->chat
+            ? $group->chat->users()->where('user_id', $user->id)->exists()
+            : $group->users()
+                ->where('users.id', $user->id)
+                ->wherePivot('status', 'accepted')
+                ->exists();
 
         if (!$isMember) {
             throw ValidationException::withMessages(['You are not a member of this group']);
@@ -172,6 +180,12 @@ class MessageService
 
     public function CreateAdsPoll(array $data)
     {
+        // Publishing an announcement is a WRITE into the group timeline and
+        // must be gated exactly like sendMessage(). Without this a user who
+        // could not even read the group (getGroupMessages refuses them) could
+        // still post a poll into it by passing its id.
+        $this->checkMembership(Group::findOrFail($data['group_id']));
+
         $chat = $this->getChatByGroupId($data['group_id']);
 
         $message = $this->createPollMessage($chat->id);
@@ -243,6 +257,15 @@ class MessageService
     public function votePoll($messageId, $optionId)
     {
         $poll = ChatPoll::where('chat_message_id', $messageId)->firstOrFail();
+
+        // Voting is a write into the group's poll, so it needs the same
+        // membership gate as posting. Resolve the poll back to its group
+        // through its chat; a private-chat poll has no group and is left alone.
+        $group = $poll->chatMessage?->chat?->group;
+
+        if ($group) {
+            $this->checkMembership($group);
+        }
 
         // Closed OR past its expiry — the app also stops sending a vote here.
         if ($poll->is_closed || ($poll->expires_at && $poll->expires_at->isPast())) {

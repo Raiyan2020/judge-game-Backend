@@ -15,9 +15,29 @@ class GroupRepository extends BaseRepository
         parent::__construct($model);
     }
 
+    /**
+     * Groups the CALLER belongs to (or owns).
+     *
+     * This used to return every group on the platform to any signed-in user,
+     * which handed out a directory of group ids — the starting point for
+     * reading other groups' members and laws. No client needs a global list:
+     * the app only ever POSTs to `/groups` and reads `/my-groups`.
+     */
     public function index()
     {
-        return $this->model->withCount('users')->latest()->get();
+        $userId = auth()->id();
+
+        return $this->model
+            ->withCount('users')
+            ->where(function ($query) use ($userId) {
+                $query->where('user_id', $userId)
+                    ->orWhereHas('users', function ($q) use ($userId) {
+                        $q->where('users.id', $userId)
+                            ->where('group_user.status', 'accepted');
+                    });
+            })
+            ->latest()
+            ->get();
     }
 
     public function createGroupWithJudge($data, $judgeId)

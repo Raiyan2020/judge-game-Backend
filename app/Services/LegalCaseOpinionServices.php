@@ -33,6 +33,21 @@ class LegalCaseOpinionServices
 
             $role = $this->resolveRole($legalCase);
 
+            // One opinion per user per stage — a lawyer / consultant cannot file
+            // twice for the same case at the same stage. There was no guard, so
+            // the same opinion could be submitted repeatedly. (A later stage —
+            // e.g. an appeal — is a different `stage`, so it stays allowed.)
+            $alreadySubmitted = $legalCase->opinions()
+                ->where('user_id', auth()->id())
+                ->where('stage', $stage)
+                ->exists();
+
+            if ($alreadySubmitted) {
+                throw ValidationException::withMessages([
+                    __('You have already submitted your opinion for this case')
+                ]);
+            }
+
             $opinionData = [
                 'user_id' => auth()->id(),
                 'opinion' => $request['opinion'] ?? null,

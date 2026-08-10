@@ -15,6 +15,11 @@ class UserResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        // A phone number is PII and is never needed to RENDER another user:
+        // the app only ever sends a phone (to invite someone), it never reads
+        // one off a member. Exposing it here meant any member list — and those
+        // were readable by any signed-in user — doubled as a phone directory.
+        $isSelf = auth('sanctum')->id() === $this->id;
 
         return [
             'id' => $this->id,
@@ -22,9 +27,9 @@ class UserResource extends JsonResource
             'name' => $this->name,
             'nickname' => $this->nickname,
             'username' => $this->username,
-            'phone' => $this->phone,
-            'country_code' => $this->country_code,
-            'full_phone' => $this->full_phone,
+            'phone' => $this->when($isSelf, fn () => $this->phone),
+            'country_code' => $this->when($isSelf, fn () => $this->country_code),
+            'full_phone' => $this->when($isSelf, fn () => $this->full_phone),
             'image' => $this->image,
             'gender' => $this->gender,
             'language' => $this->language,

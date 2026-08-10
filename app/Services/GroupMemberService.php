@@ -100,7 +100,7 @@ class GroupMemberService
                $user->fcm_token,
                $group->name,
                trim(($inviter?->name ?? '') . ' دعاك للانضمام إلى ' . $group->name),
-               ['type' => 'group_invite', 'id' => $group->id],
+               ['type' => 'group_invite', 'id' => (string) $group->id, 'related_data' => (string) $group->id],
            );
        } catch (\Throwable $e) {
            \Log::warning('Group invite notification failed: ' . $e->getMessage());
@@ -159,7 +159,7 @@ class GroupMemberService
                $owner->fcm_token,
                $group->name,
                trim(($responder->name ?? '') . ' ' . $verb . $group->name),
-               ['type' => $accepted ? 'group_invite_accepted' : 'group_invite_rejected', 'id' => $group->id],
+               ['type' => $accepted ? 'group_invite_accepted' : 'group_invite_rejected', 'id' => (string) $group->id, 'related_data' => (string) $group->id],
            );
        } catch (\Throwable $e) {
            \Log::warning('Group invite response notification failed: ' . $e->getMessage());
@@ -169,6 +169,14 @@ class GroupMemberService
      public function leaveGroup($group)
     {
         $user = auth()->user();
+
+        // The owner IS the judge, and that is immutable (changeRole enforces
+        // the same rule). Letting them leave detached the last member while
+        // `groups.user_id` still pointed at them: the group vanished from
+        // /my-groups — the app's only navigation surface — for the one person
+        // who could administer it, with no route to undo it (there is no
+        // DELETE /groups, and re-inviting the creator is refused).
+        $this->ensureNotGroupOwner($group, $user->id, __('The group owner cannot leave the group'));
 
         // Check if user is a member of the group
         $member = $group->users()->where('user_id', $user->id)->wherePivot('status', 'accepted')->first();
@@ -187,10 +195,26 @@ class GroupMemberService
         return true;
     }
 
+    /**
+     * The group owner's membership is structural, not editable: `groups.user_id`
+     * keeps pointing at them, so detaching the pivot produces a group that is
+     * owned by a non-member — invisible in /my-groups yet still writable by its
+     * owner, and unrecoverable (no DELETE route, and re-inviting the creator is
+     * refused). Mirrors the guard changeRole already applies.
+     */
+    private function ensureNotGroupOwner($group, $userId, string $message): void
+    {
+        if ((int) $userId === (int) $group->user_id) {
+            throw ValidationException::withMessages(['user_id' => $message]);
+        }
+    }
+
     public function removeMember($group, $user)
     {
         $currentUser = auth()->user();
         $userId = $user->id;
+
+        $this->ensureNotGroupOwner($group, $userId, __('The group owner cannot be removed from the group'));
 
         // // Check if current user is the owner
         // if ($group->user_id !== $currentUser->id) {
@@ -204,7 +228,7 @@ class GroupMemberService
             $group,
             'remove_members'
         )) {
-            throw ValidationException::withMessages(['You are not authorized to remove members from the group.']);
+            throw ValidationException::withMessages([__('You are not authorized to remove members from the group.')]);
         }
 
         // Check if user is a member of the group

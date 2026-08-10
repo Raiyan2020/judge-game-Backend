@@ -122,4 +122,18 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Static activation code
+    |--------------------------------------------------------------------------
+    |
+    | While SMS/WhatsApp delivery is not wired up, every account verifies with
+    | this fixed code — otherwise nobody could sign in at all. Set STATIC_OTP
+    | to an EMPTY value in the environment the moment delivery works, and
+    | AuthService will issue random 4-digit codes instead.
+    |
+    */
+
+    'static_otp' => env('STATIC_OTP', '1234'),
+
 ];

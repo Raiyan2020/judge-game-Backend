@@ -63,8 +63,13 @@ class AuthService
     {
         $user = $this->repo->checkUser($request);
         if ($user) {
-             $this->repo->update($user);
-             $user['token'] = $this->generateToken($user);
+            // BURN the code. This used to call `update($user)` with no
+            // attributes, and BaseRepository::update returns false without
+            // writing when the payload is empty — so the code was never
+            // cleared and stayed valid forever, replayable by anyone who knew
+            // the phone number. A fresh code is minted by `login()`.
+            $this->repo->update($user, ['code' => null]);
+            $user['token'] = $this->generateToken($user);
             return $user;
         }
 
@@ -81,10 +86,25 @@ class AuthService
     }
 
 
-       private function createCode()
+    /**
+     * The activation code.
+     *
+     * SMS/WhatsApp delivery is still commented out below, so a random code
+     * would lock every user out — the fixed code is what makes the app usable
+     * today. It is therefore a CONFIG value, not a literal: once delivery is
+     * wired, clear `STATIC_OTP` in the environment and this starts issuing
+     * random codes with no code change.
+     *
+     * Until then, treat the account as protected only by rate limiting (see
+     * the `throttle` on the auth routes) and by burning the code on use.
+     */
+    private function createCode()
     {
-        // return rand(1111, 9999);
-        return "1234";
+        $static = config('auth.static_otp');
+
+        return $static !== null && $static !== ''
+            ? (string) $static
+            : (string) random_int(1000, 9999);
     }
 
 

@@ -88,7 +88,7 @@ class GroupService
                 $group,
                 'change_group_name'
             )) {
-                throw ValidationException::withMessages(['You are not authorized to change the group name.']);
+                throw ValidationException::withMessages([__('You are not authorized to change the group name.')]);
             }
         }
 

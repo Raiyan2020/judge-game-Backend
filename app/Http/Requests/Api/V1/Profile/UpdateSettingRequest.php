@@ -14,7 +14,9 @@ class UpdateSettingRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'language' => 'sometimes|string|max:10',
+            // Whitelisted to the locales the app actually ships. `string|max:10`
+            // accepted anything, so `language=zz` persisted onto the profile.
+            'language' => 'sometimes|string|in:ar,en',
             'notified' => 'sometimes|boolean',
         ];
     }

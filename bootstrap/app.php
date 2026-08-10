@@ -29,7 +29,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'localization' => \App\Http\Middleware\Localization::class,
             'auth' => \App\Http\Middleware\Authenticate::class,
             'checkActiveSubscription' => \App\Http\Middleware\CheckActiveSubscription::class,
-            
+            'groupMember' => \App\Http\Middleware\EnsureGroupMember::class,
+
 
 
         ]);

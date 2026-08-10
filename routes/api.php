@@ -33,7 +33,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::group(['middleware' => 'setLocale'], function () {
 
-    Route::group(['prefix' => 'auth'], function () {
+    // Throttled: the activation code is a 4-digit value that (today) is a
+    // known constant, and these routes are unauthenticated. Without a rate
+    // limit, codes and phone numbers can be enumerated at machine speed.
+    Route::group(['prefix' => 'auth', 'middleware' => 'throttle:10,1'], function () {
         Route::post('register', [AuthController::class, 'register']);
         Route::post('login', [AuthController::class, 'login']);
         Route::post('verify-code', [AuthController::class, 'verifyCode']);
@@ -67,8 +70,15 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::get('my-invitations', [GroupController::class, 'myInvitations']);
         Route::delete('groups/{group}/members/{userId}', [GroupController::class, 'removeMember']);
         Route::patch('groups/{group}/members/{userId}/role', [GroupController::class, 'changeRole']);
-        Route::get('groups/{group}/members', [GroupMemberController::class, 'index']);
-        Route::post('groups/{group}/invite', [GroupMemberController::class, 'inviteMember']);
+        // Group-scoped reads are members-only: without `groupMember` any
+        // signed-in user could dump any group's members (phone numbers
+        // included), laws, cases and statistics by guessing the id.
+        // `accept`/`reject` are intentionally NOT gated — the caller there is a
+        // pending invitee, not yet a member.
+        Route::get('groups/{group}/members', [GroupMemberController::class, 'index'])
+            ->middleware('groupMember');
+        Route::post('groups/{group}/invite', [GroupMemberController::class, 'inviteMember'])
+            ->middleware('groupMember');
         Route::post('groups/{group}/accept', [GroupMemberController::class, 'acceptInvitation']);
         Route::post('groups/{group}/reject', [GroupMemberController::class, 'rejectInvitation']);
         Route::post('groups/{group}/users/{user}/remove-member', [GroupMemberController::class, 'removeMember']);
@@ -76,24 +86,29 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::post('groups/{group}/leave', [GroupMemberController::class, 'leaveGroup']);
 
         Route::apiResource('group-laws', GroupLawController::class)->only(['store', 'update', 'destroy']);
-        Route::get('group-laws/{group}', [GroupLawController::class, 'index']);
+        Route::get('group-laws/{group}', [GroupLawController::class, 'index'])
+            ->middleware('groupMember');
         Route::get('groups/{group}/messages', [MessageController::class, 'getGroupMessages']);
-        Route::get('groups/{group}/members-by-role', [GroupMemberController::class, 'getMemberByRole']);
+        Route::get('groups/{group}/members-by-role', [GroupMemberController::class, 'getMemberByRole'])
+            ->middleware('groupMember');
         Route::get('private-messages', [MessageController::class, 'getPrivateMessages']);
         Route::post('messages', [MessageController::class, 'store']);
         Route::get('chats', [MessageController::class, 'getChats']);
         Route::post('messages/{messageId}/vote', [MessageController::class, 'votePoll']);
         Route::post('ads', [AdsController::class, 'store']);
         Route::get('legal-cases/{legalCase}', [LegalCaseController::class, 'show']);
-        Route::get('legal-cases/groups/{group}', [LegalCaseController::class, 'index']);
+        Route::get('legal-cases/groups/{group}', [LegalCaseController::class, 'index'])
+            ->middleware('groupMember');
         Route::get('legal-cases-status', [LegalCaseController::class, 'getCaseStatus']);
         Route::PUT('legal-case-opinions/{opinion}/review',[LegalCaseOpinionController::class, 'reviewOpinion']);
         Route::get('news', [LegalCaseNewsController::class, 'index']);
         Route::get('packages', [PackageController::class, 'index']);
         Route::post('packages/subscribe', [PackageSubscriptionController::class, 'subscribe']);
-        Route::get('groups/{group}/users/{user}/statistics', [UserStatisticsController::class, 'show']);
+        Route::get('groups/{group}/users/{user}/statistics', [UserStatisticsController::class, 'show'])
+            ->middleware('groupMember');
         // The signed-in user's achievement ladder in this group (real progress).
-        Route::get('groups/{group}/achievements', [\App\Http\Controllers\Api\V1\AchievementController::class, 'index']);
+        Route::get('groups/{group}/achievements', [\App\Http\Controllers\Api\V1\AchievementController::class, 'index'])
+            ->middleware('groupMember');
         Route::post('coupons', [CouponController::class, 'store']);
         Route::get('permissions', [PermissionController::class, 'index']);
         Route::post('permissions', [PermissionController::class, 'togglePermission']);

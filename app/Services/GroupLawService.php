@@ -88,7 +88,7 @@ class GroupLawService
             ->exists();
 
         if (!$isMember) {
-            throw ValidationException::withMessages(['You are not a member of this group']);
+            throw ValidationException::withMessages([__('You are not a member of this group')]);
         }
     }
 

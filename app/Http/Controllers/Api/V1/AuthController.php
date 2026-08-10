@@ -44,8 +44,16 @@ class AuthController extends Controller
   public function verifyCode(CheckCodeRequest $request)
   {
     $user = $this->authService->checkCode($request->validated());
-     $this->legalCaseWinLossCounts($user);
-    if ($user)  return \responder::success(new UserResource($user->load('activeSubscription.package','points')));
+
+    // The counts load must come AFTER the guard: `checkCode` returns `false`
+    // for a wrong code, and `false->loadCount()` threw a TypeError, so a user
+    // who mistyped their code got HTTP 500 "Server Error" and the correct
+    // message below was unreachable.
+    if ($user) {
+        $this->legalCaseWinLossCounts($user);
+
+        return \responder::success(new UserResource($user->load('activeSubscription.package','points')));
+    }
 
     return \responder::error(__('Error verification code try again'));
   }

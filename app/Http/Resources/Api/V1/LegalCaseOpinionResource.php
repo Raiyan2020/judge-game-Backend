@@ -15,6 +15,12 @@ class LegalCaseOpinionResource extends JsonResource
             'role' => $this->role,
             'opinion' => $this->opinion,
             'final_requests' => $this->final_requests,
+            // The five structured fields (case/evidence/witnesses/damages/
+            // requests). Stored + cast to array, but never serialized before —
+            // so the defense lawyer's and the consultant's DETAILED opinion
+            // always arrived null in the app ("no data"). Read there under those
+            // exact keys.
+            'legal_arguments' => $this->legal_arguments,
             'is_reviewed' => $this->is_correct !== null,
             'is_correct' => $this->is_correct,
             'images' =>  $this->relationLoaded('media') ? MediaResource::collection($this->getMedia('images')) :[],

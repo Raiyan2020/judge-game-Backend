@@ -9,6 +9,8 @@ use App\Http\Resources\Api\V1\UserResource;
 use App\Http\Requests\Api\V1\Auth\LoginRequest;
 use App\Http\Requests\Api\V1\Auth\RegisterRequest;
 use App\Http\Requests\Api\V1\Auth\CheckCodeRequest;
+use App\Http\Requests\Api\V1\Auth\ConfirmPhoneChangeRequest;
+use App\Http\Requests\Api\V1\Auth\RequestPhoneChangeRequest;
 
 class AuthController extends Controller
 {
@@ -63,6 +65,27 @@ class AuthController extends Controller
    * @param Request $request
    * @return \Illuminate\Http\JsonResponse
    */
+
+  /**
+   * Step 1 of changing the account's phone: stage the new number and send it a
+   * code. The live number is untouched until `confirmPhoneChange` succeeds.
+   */
+  public function requestPhoneChange(RequestPhoneChangeRequest $request)
+  {
+    $this->authService->requestPhoneChange($request->user(), $request->validated());
+
+    return \responder::success(__('A verification code has been sent to the new number.'));
+  }
+
+  /**
+   * Step 2: verify the code and adopt the staged number.
+   */
+  public function confirmPhoneChange(ConfirmPhoneChangeRequest $request)
+  {
+    $user = $this->authService->confirmPhoneChange($request->user(), $request->validated());
+
+    return \responder::success(new UserResource($user->load('activeSubscription.package', 'points')));
+  }
 
   public function logout(Request $request)
   {

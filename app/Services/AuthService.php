@@ -59,6 +59,115 @@ class AuthService
     }
 
 
+    /**
+     * Step 1 of a phone change: stage the NEW number and issue a code for it.
+     *
+     * The live `users.phone` is deliberately untouched here. Writing it before
+     * verification is what made a typo unrecoverable — login is by phone, so a
+     * wrong digit locked the owner out of their own account with no way back —
+     * and let anyone claim an unregistered number belonging to someone else.
+     *
+     * @return string the code, so the caller can deliver it to the NEW number
+     */
+    public function requestPhoneChange($user, array $request): string
+    {
+        $phone = $request['phone'];
+        $countryCode = $request['country_code'];
+
+        if ($user->phone === $phone && (string) $user->country_code === (string) $countryCode) {
+            throw ValidationException::withMessages([
+                'phone' => __('This is already your phone number.'),
+            ]);
+        }
+
+        // Re-checked here as well as in the form request: the number could have
+        // been registered by someone else between the two calls.
+        if ($this->repo->getUserByPhone($phone, $countryCode)) {
+            throw ValidationException::withMessages([
+                'phone' => __('This phone number is already registered.'),
+            ]);
+        }
+
+        $code = $this->createCode();
+
+        $this->repo->update($user, [
+            'pending_phone' => $phone,
+            'pending_country_code' => $countryCode,
+            'pending_phone_code' => $code,
+            'pending_phone_expires_at' => now()->addMinutes(15),
+        ]);
+
+        # todo: send the code to the NEW number once SMS delivery is wired.
+        // whatsapp($countryCode . $phone, $code . ' Is Your verification code.');
+
+        return $code;
+    }
+
+    /**
+     * Step 2: verify the staged number and make it the account's phone.
+     *
+     * Only this method writes `users.phone`, and only after matching a code
+     * that was sent to the number being claimed.
+     */
+    public function confirmPhoneChange($user, array $request)
+    {
+        $pendingPhone = $user->pending_phone;
+        $expiresAt = $user->pending_phone_expires_at;
+
+        if (!$pendingPhone || !$user->pending_phone_code) {
+            throw ValidationException::withMessages([
+                'phone' => __('No pending phone change request.'),
+            ]);
+        }
+
+        if ($expiresAt && $expiresAt->isPast()) {
+            $this->clearPendingPhone($user);
+
+            throw ValidationException::withMessages([
+                'code' => __('The verification code has expired, please try again.'),
+            ]);
+        }
+
+        if (!hash_equals((string) $user->pending_phone_code, (string) $request['code'])) {
+            throw ValidationException::withMessages([
+                'code' => __('Error verification code try again'),
+            ]);
+        }
+
+        // Last-moment guard: someone may have registered this number while the
+        // request was pending.
+        if ($this->repo->getUserByPhone($pendingPhone, $user->pending_country_code)) {
+            $this->clearPendingPhone($user);
+
+            throw ValidationException::withMessages([
+                'phone' => __('This phone number is already registered.'),
+            ]);
+        }
+
+        $this->repo->update($user, [
+            'phone' => $pendingPhone,
+            'country_code' => $user->pending_country_code,
+            // The code is burned with the change, exactly as the login code is:
+            // a code that stays valid is replayable.
+            'pending_phone' => null,
+            'pending_country_code' => null,
+            'pending_phone_code' => null,
+            'pending_phone_expires_at' => null,
+        ]);
+
+        return $user->refresh();
+    }
+
+    private function clearPendingPhone($user): void
+    {
+        $this->repo->update($user, [
+            'pending_phone' => null,
+            'pending_country_code' => null,
+            'pending_phone_code' => null,
+            'pending_phone_expires_at' => null,
+        ]);
+    }
+
     public function checkCode($request)
     {
         $user = $this->repo->checkUser($request);

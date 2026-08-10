@@ -11,7 +11,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'nickname', 'username', 'phone', 'country_code', 'code', 'image', 'gender', 'language', 'fcm_token', 'notified', 'birthdate', 'status', 'country_id'])]
+#[Fillable(['name', 'nickname', 'username', 'phone', 'country_code', 'code', 'image', 'gender', 'language', 'fcm_token', 'notified', 'birthdate', 'status', 'country_id', 'pending_phone', 'pending_country_code', 'pending_phone_code', 'pending_phone_expires_at'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -27,6 +27,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            // Cast so expiry is compared as a date, not a string.
+            'pending_phone_expires_at' => 'datetime',
         ];
     }
 

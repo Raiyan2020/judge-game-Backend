@@ -58,6 +58,15 @@ Route::group(['middleware' => 'setLocale'], function () {
             Route::post('update-setting', [ProfileController::class, 'updateSetting']);
             Route::post('fcm-token', [ProfileController::class, 'updateFcmToken']);
             Route::post('logout', [AuthController::class, 'logout']);
+
+            // Changing the login identity is verified, and throttled like the
+            // unauthenticated auth routes: the code is 4 digits, so an
+            // unlimited confirm endpoint is a brute-forceable takeover of
+            // whichever number was staged.
+            Route::post('phone-change/request', [AuthController::class, 'requestPhoneChange'])
+                ->middleware('throttle:5,1');
+            Route::post('phone-change/confirm', [AuthController::class, 'confirmPhoneChange'])
+                ->middleware('throttle:5,1');
         });
 
         // Notifications (Laravel database notifications). The controller already

@@ -228,5 +228,9 @@
     "You are not authorized to change the group name.": "ليست لديك صلاحية تغيير اسم المجموعة.",
     "You are not authorized to remove members from the group.": "ليست لديك صلاحية إزالة أعضاء من المجموعة.",
     "Role changed successfully": "تم تغيير الدور بنجاح",
-    "Member removed successfully": "تمت إزالة العضو بنجاح"
+    "Member removed successfully": "تمت إزالة العضو بنجاح",
+    "This is already your phone number.": "هذا هو رقم هاتفك الحالي بالفعل.",
+    "No pending phone change request.": "لا يوجد طلب تغيير رقم قيد الانتظار.",
+    "The verification code has expired, please try again.": "انتهت صلاحية كود التحقق، يرجى المحاولة مرة أخرى.",
+    "A verification code has been sent to the new number.": "تم إرسال كود التحقق إلى الرقم الجديد."
 }

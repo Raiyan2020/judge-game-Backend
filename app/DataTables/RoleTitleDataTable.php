@@ -23,9 +23,11 @@ class RoleTitleDataTable extends DataTable
     {
         return (new EloquentDataTable($query))
             ->addColumn('action', 'dashboard.role-titles.action')
-            ->filterColumn('name', function ($query, $keyword) {
-                $query->whereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(title, '$.en'))) like LOWER(?)", ["%$keyword%"])
+            ->filterColumn('title', function ($query, $keyword) {
+                $query->where(function ($q) use ($keyword) {
+                    $q->whereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(title, '$.en'))) like LOWER(?)", ["%$keyword%"])
                       ->orWhereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(title, '$.ar'))) like LOWER(?)", ["%$keyword%"]);
+                });
             })
             ->addColumn('title', function ($roleTitle) {
                 return $roleTitle->title;

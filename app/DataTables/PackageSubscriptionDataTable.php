@@ -33,6 +33,25 @@ class PackageSubscriptionDataTable extends DataTable
             ->addColumn('ends_at', function ($packageSubscription) {
                 return $packageSubscription->ends_at ? $packageSubscription->ends_at->format('Y-m-d') : '' ;
             })
+            ->filterColumn('package_name', function ($query, $keyword) {
+                $query->whereHas('package', function ($packageQuery) use ($keyword) {
+                    $packageQuery->where(function ($q) use ($keyword) {
+                        $q->whereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(name, '$.en'))) like LOWER(?)", ["%$keyword%"])
+                            ->orWhereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(name, '$.ar'))) like LOWER(?)", ["%$keyword%"]);
+                    });
+                });
+            })
+            ->filterColumn('user_name', function ($query, $keyword) {
+                $query->whereHas('user', function ($userQuery) use ($keyword) {
+                    $userQuery->where('name', 'like', "%{$keyword}%");
+                });
+            })
+            ->filterColumn('starts_at', function ($query, $keyword) {
+                $query->whereDate('starts_at', 'like', "%{$keyword}%");
+            })
+            ->filterColumn('ends_at', function ($query, $keyword) {
+                $query->whereDate('ends_at', 'like', "%{$keyword}%");
+            })
            
           
             ->addIndexColumn()
@@ -95,8 +114,8 @@ class PackageSubscriptionDataTable extends DataTable
     {
         return [
             Column::computed('DT_RowIndex')->title('#'),
-            Column::computed('package_name')->title(__('packagename')),
-            Column::computed('user_name')->title(__('username')),
+            Column::computed('package_name')->title(__('packagename'))->searchable(),
+            Column::computed('user_name')->title(__('username'))->searchable(),
             Column::make('total')->title(__('price')),
             Column::make('discount')->title(__('discount')),
             Column::computed('starts_at')->title(__('starts at')),

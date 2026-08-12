@@ -23,6 +23,15 @@ class AdminDataTable extends DataTable
     {
         return (new EloquentDataTable($query))
             ->addColumn('action', 'dashboard.admins.action')
+            ->filterColumn('name', function ($query, $keyword) {
+                $query->where('admins.name', 'like', "%{$keyword}%");
+            })
+            ->filterColumn('phone', function ($query, $keyword) {
+                $query->where('admins.phone', 'like', "%{$keyword}%");
+            })
+            ->filterColumn('email', function ($query, $keyword) {
+                $query->where('admins.email', 'like', "%{$keyword}%");
+            })
             ->addIndexColumn()
             ->setRowId('id')
             ->rawColumns(['action']);
@@ -33,7 +42,7 @@ class AdminDataTable extends DataTable
      */
     public function query(Admin $model): QueryBuilder
     {
-        return $model->newQuery()->latest();
+        return $model->newQuery()->select('admins.*');
     }
 
     /**

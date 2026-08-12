@@ -45,6 +45,38 @@ function uploadeFile($folders, $value)
     return $path;
 }
 
+/**
+ * Dashboard logo URL (sidebar + login). Falls back to the bundled icon.
+ */
+function dashboard_logo_url(): string
+{
+    $setting = \App\Models\Setting::where('name', 'dashboard_logo')->first();
+    $path = $setting?->getTranslation('value', 'en') ?: '_dashboard/sidebar-logo.png';
+
+    if (filter_var($path, FILTER_VALIDATE_URL)) {
+        return $path;
+    }
+
+    return asset(ltrim($path, '/'));
+}
+
+/**
+ * Cache-bust version for the dashboard logo file.
+ */
+function dashboard_logo_version(): string
+{
+    $setting = \App\Models\Setting::where('name', 'dashboard_logo')->first();
+    $path = $setting?->getTranslation('value', 'en') ?: '_dashboard/sidebar-logo.png';
+
+    if (filter_var($path, FILTER_VALIDATE_URL)) {
+        return '1';
+    }
+
+    $fullPath = public_path(ltrim($path, '/'));
+
+    return file_exists($fullPath) ? (string) filemtime($fullPath) : '1';
+}
+
 
 
 class responder

@@ -2,10 +2,12 @@
 
 namespace App\Http\Requests\Admin\Tip;
 
+use App\Http\Requests\Admin\Concerns\UsesAdminAttributes;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreRequest extends FormRequest
 {
+    use UsesAdminAttributes;
     /**
      * Determine if the user is authorized to make this request.
      */

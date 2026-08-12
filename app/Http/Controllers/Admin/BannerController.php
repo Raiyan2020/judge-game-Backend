@@ -8,7 +8,6 @@ use App\Services\BannerService;
 use App\DataTables\BannerDataTable;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Banner\StoreRequest;
-use App\Http\Requests\Admin\Banner\UpdateRequest;
 
 class BannerController extends Controller
 {
@@ -46,9 +45,9 @@ class BannerController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(Banner $banner)
     {
-        //
+        return view('dashboard.banners.show', ['banner' => $banner]);
     }
 
     /**

@@ -52,9 +52,9 @@ class AdminController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(Admin $admin)
     {
-        //
+        return view('dashboard.admins.show', ['admin' => $admin]);
     }
 
     /**

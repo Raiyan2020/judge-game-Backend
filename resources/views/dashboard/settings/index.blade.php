@@ -27,7 +27,7 @@
 
                                         <tr>
                                             <td>{{$loop->iteration}}</td>
-                                            <td>{{$item}}</td>
+                                            <td>{{ __($item) }}</td>
 
                                              <td>
                                                 <a class="btn btn-warning" href="{{route('admin.settings.show',$item)}}"><i class="fa fa-pencil"></i></a>

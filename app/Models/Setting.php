@@ -9,5 +9,8 @@ use Spatie\Translatable\HasTranslations;
 class Setting extends Model
 {
     use HasFactory , HasTranslations;
+
+    protected $fillable = ['name', 'type', 'value', 'page', 'slug', 'title'];
+
     public $translatable = ['value'];
 }

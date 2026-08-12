@@ -38,12 +38,33 @@ class SettingRepository extends BaseRepository
     public function store($data)
     {
         foreach ($data as $key => $value) {
-            if(!$value ) continue;
-            {
-                if(!isset($value['ar'])) $value['ar'] = $value['en'];
-                $this->model->where(['name'=> $key])->update(["value"=>$value]);
+            $setting = $this->model->where('name', $key)->first();
+            if (!$setting || $setting->type === 'file') {
+                continue;
             }
+
+            if (!$value) {
+                continue;
+            }
+
+            if (!isset($value['ar'])) {
+                $value['ar'] = $value['en'];
+            }
+
+            $this->model->where(['name' => $key])->update(['value' => $value]);
         }
+
+        foreach ($this->model->where('type', 'file')->get() as $setting) {
+            if (!request()->hasFile($setting->name)) {
+                continue;
+            }
+
+            $path = uploader(request()->file($setting->name));
+            $this->model->where('name', $setting->name)->update([
+                'value' => ['en' => $path, 'ar' => $path],
+            ]);
+        }
+
         return true;
     }
 

@@ -1,187 +1,228 @@
 <!DOCTYPE html>
-<html class="loading" lang="en" data-textdirection="rtl">
-<!-- BEGIN: Head-->
-
+<html class="loading" lang="{{ app()->getLocale() }}" data-textdirection="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0, minimal-ui">
-    <meta name="description"
-        content="Vuexy admin is super flexible, powerful, clean &amp; modern responsive bootstrap 4 admin template with unlimited possibilities.">
-    <meta name="keywords"
-        content="admin template, Vuexy admin template, dashboard template, flat admin template, responsive admin template, web app">
-    <meta name="author" content="PIXINVENT">
-    <title> JUDGE | تسجيل الدخول</title>
-    {{--    <link rel="apple-touch-icon" href="{{ asset('assets/dashboard') }}/app-assets/images/ico/apple-icon-120.png"> --}}
-    {{--    <link rel="shortcut icon" type="image/x-icon" href="{{ asset('assets/dashboard') }}/app-assets/images/ico/favicon.ico"> --}}
-    <link href="https://fonts.googleapis.com/css?family=Montserrat:300,400,500,600" rel="stylesheet">
-    <!-- BEGIN: Vendor CSS-->
-    <link rel="stylesheet" type="text/css" href="{{ asset('_dashboard/app-assets/vendors/css/vendors-rtl.min.css') }}">
-    <!-- END: Vendor CSS-->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>JUDGE | {{ __('login') }}</title>
 
-    <!-- BEGIN: Theme CSS-->
-    <link rel="stylesheet" type="text/css" href="{{ asset('_dashboard/app-assets/css-rtl/bootstrap.css') }}">
-    <link rel="stylesheet" type="text/css" href="{{ asset('_dashboard/app-assets/css-rtl/bootstrap-extended.css') }}">
-    <link rel="stylesheet" type="text/css" href="{{ asset('_dashboard/app-assets/css-rtl/colors.css') }}">
-    <link rel="stylesheet" type="text/css" href="{{ asset('_dashboard/app-assets/css-rtl/components.css') }}">
-    <link rel="stylesheet" type="text/css" href="{{ asset('_dashboard/app-assets/css-rtl/themes/dark-layout.css') }}">
-    <link rel="stylesheet" type="text/css"
-        href="{{ asset('_dashboard/app-assets/css-rtl/themes/semi-dark-layout.css') }}">
-    <!-- END: Theme CSS-->
+    @if (app()->getLocale() === 'ar')
+        <link rel="stylesheet" href="{{ asset('_dashboard/app-assets/vendors/css/vendors-rtl.min.css') }}">
+        <link rel="stylesheet" href="{{ asset('_dashboard/app-assets/css-rtl/bootstrap.css') }}">
+        <link rel="stylesheet" href="{{ asset('_dashboard/app-assets/css-rtl/components.css') }}">
+        <link rel="stylesheet" href="{{ asset('_dashboard/app-assets/css-rtl/themes/dark-layout.css') }}">
+        <link rel="stylesheet" href="{{ asset('_dashboard/app-assets/css-rtl/custom-rtl.css') }}">
+    @else
+        <link rel="stylesheet" href="{{ asset('_dashboard/app-assets/vendors/css/vendors.min.css') }}">
+        <link rel="stylesheet" href="{{ asset('_dashboard/app-assets/css/bootstrap.css') }}">
+        <link rel="stylesheet" href="{{ asset('_dashboard/app-assets/css/components.css') }}">
+        <link rel="stylesheet" href="{{ asset('_dashboard/app-assets/css/themes/dark-layout.css') }}">
+    @endif
 
-    <!-- BEGIN: Page CSS-->
-    <link rel="stylesheet" type="text/css"
-        href="{{ asset('_dashboard/app-assets/css-rtl/core/menu/menu-types/vertical-menu.css') }}">
-    <link rel="stylesheet" type="text/css"
-        href="{{ asset('_dashboard/app-assets/css-rtl/core/colors/palette-gradient.css') }}">
-    <link rel="stylesheet" type="text/css" href="{{ asset('_dashboard/app-assets/css-rtl/pages/authentication.css') }}">
-    <!-- END: Page CSS-->
-
-    <!-- BEGIN: Custom CSS-->
-    <link rel="stylesheet" type="text/css" href="{{ asset('_dashboard/app-assets/css-rtl/custom-rtl.css') }}">
-    <link rel="stylesheet" type="text/css" href="{{ asset('_dashboard/assets/css/style-rtl.css') }}">
-    <!-- END: Custom CSS-->
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta2/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    @if (app()->getLocale() === 'ar')
+        <link href="https://fonts.googleapis.com/css2?family=Almarai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    @else
+        <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
+    @endif
+    <link rel="stylesheet" href="{{ asset('_dashboard/assets/css/login.css') }}?v={{ @filemtime(public_path('_dashboard/assets/css/login.css')) }}">
+    <link rel="stylesheet" href="{{ asset('_dashboard/assets/css/judge-brand-animation.css') }}?v={{ @filemtime(public_path('_dashboard/assets/css/judge-brand-animation.css')) }}">
 </head>
-<!-- END: Head-->
 
-<!-- BEGIN: Body-->
+<body id="content_body" class="login-page vertical-layout vertical-menu-modern 1-column blank-page dark-layout" data-open="click" data-menu="vertical-menu-modern" data-col="1-column" data-type="dark"
+    style="font-family: {{ app()->getLocale() === 'ar' ? "'Almarai'" : "'Cairo'" }}, sans-serif !important;">
 
-<body
-    class="vertical-layout vertical-menu-modern semi-dark-layout 1-column  navbar-floating footer-static bg-full-screen-image  blank-page blank-page"
-    data-open="click" data-menu="vertical-menu-modern" data-col="1-column" data-layout="semi-dark-layout">
-    <header class="header-overlay">
-        <a class="nav-link" href="{{ route('change-language', ['lang' => (app()->getLocale() === 'ar' ? 'en' : 'ar')]) }}">
-            {{ app()->getLocale() === 'ar' ? __('English') : __('Arabic') }}
-        </a>
-    </header>
-    <!-- BEGIN: Content-->
-    <div class="app-content content">
-        <div class="content-overlay"></div>
-        <div class="header-navbar-shadow"></div>
-        <div class="content-wrapper">
-            <div class="content-header row">
-            </div>
-            <div class="content-body">
+<canvas id="stars-canvas"></canvas>
+<div class="cosmic-nebula cosmic-nebula-1"></div>
+<div class="cosmic-nebula cosmic-nebula-2"></div>
 
-                <section class="row flexbox-container">
-                    <div class="col-xl-8 col-11 d-flex justify-content-center">
-                        <div class="card bg-authentication rounded-0 mb-0">
-                            <div class="row m-0">
-                                <div class="col-lg-6 d-lg-block d-none text-center align-self-center px-1 py-0">
-                                    <img src="{{ asset('_dashboard/login.png') }}" alt="branding logo">
-                                </div>
-                                <div class="col-lg-6 col-12 p-0">
-                                    <div class="card rounded-0 mb-0 px-2">
-                                        <div class="card-header pb-1">
-                                            <div class="card-title">
-                                                <h4 class="mb-0"> {{ __('login') }}</h4>
-                                            </div>
-                                        </div>
-                                    <p class="px-2"> {{ __('welcome to judge') }} </p>
-                                        <div class="card-content">
+<svg class="constellation" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+    <line x1="1600" y1="200" x2="1700" y2="350" />
+    <line x1="1700" y1="350" x2="1650" y2="500" />
+    <line x1="1650" y1="500" x2="1750" y2="600" />
+    <line x1="1750" y1="600" x2="1680" y2="750" />
+    <circle cx="1600" cy="200" r="3" />
+    <circle cx="1700" cy="350" r="2.5" />
+    <circle cx="1650" cy="500" r="2" />
+    <circle cx="1750" cy="600" r="3" />
+    <circle cx="1680" cy="750" r="2" />
+</svg>
 
+<div class="login-controls">
+    <a class="login-control-btn login-lang-toggle"
+       aria-label="{{ app()->getLocale() === 'ar' ? 'Switch to English' : 'التبديل إلى العربية' }}"
+       href="{{ route('change-language', ['lang' => app()->getLocale() === 'ar' ? 'en' : 'ar']) }}">
+        @if (app()->getLocale() === 'ar')
+            <img src="{{ asset('_dashboard/assets/flags/svg/us.svg') }}" alt="US">
+            <span class="lang-label">{{ __('English') }}</span>
+        @else
+            <img src="{{ asset('_dashboard/assets/flags/svg/sa.svg') }}" alt="SA">
+            <span class="lang-label">{{ __('Arabic') }}</span>
+        @endif
+    </a>
+    <a class="login-control-btn" href="#" id="layout-mode-login" title="{{ __('Theme mode') }}">
+        <i class="ficon feather icon-sun"></i>
+    </a>
+</div>
 
-                                            @if (session()->has('success'))
-                                                <div class="alert alert-success alert-dismissable fadeout-msg">
-                                                    <p>{{ session()->get('success') }}</p>
-                                                </div>
-                                            @endif
-
-                                            @if (session()->has('fail'))
-                                                <div class="alert alert-danger alert-dismissable fadeout-msg">
-                                                    <p>{{ session()->get('fail') }}</p>
-                                                </div>
-                                            @endif
-
-                                            @if (session()->has('info'))
-                                                <div class="alert alert-info alert-dismissable fadeout-msg">
-                                                    <p>{{ session()->get('info') }}</p>
-                                                </div>
-                                            @endif
-
-                                            @if (count($errors) > 0)
-                                                <div class="alert alert-danger alert-dismissable">
-                                                    <ul>
-                                                        @foreach ($errors->all() as $error)
-                                                            <li>{{ $error }}</li>
-                                                        @endforeach
-                                                    </ul>
-                                                </div>
-                                            @endif
-
-                                            <div class="card-body pt-1">
-                                                <form action="{{ route('admin.login') }}" method="post">@csrf
-                                                    <fieldset
-                                                        class="form-label-group form-group position-relative has-icon-left">
-                                                        <input type="email" class="form-control" id="user-name"
-                                                            name="email" placeholder="example@example.com" required>
-                                                        <div class="form-control-position">
-                                                            <i class="feather icon-user"></i>
-                                                        </div>
-                                                        <label for="user-name">{{ __('email') }} </label>
-                                                    </fieldset>
-
-                                                    <fieldset class="form-label-group position-relative has-icon-left">
-                                                        <input type="password" class="form-control" name="password"
-                                                            id="user-password" placeholder="********" required>
-                                                        <div class="form-control-position">
-                                                            <i class="feather icon-lock"></i>
-                                                        </div>
-                                                        <label for="user-password"> {{ __('password') }}</label>
-                                                    </fieldset>
-
-                                                    <button type="submit"
-                                                        class="btn btn-primary float-right btn-inline">
-                                                        {{ __('login') }}
-                                                    </button>
-                                                </form>
-                                            </div>
-                                        </div>
-
-                                        <div class="login-footer"></div>
-
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-            </div>
+<div class="login-page-wrapper">
+    <div class="login-card">
+        <div class="login-brand judge-brand-logo judge-brand-logo--login">
+            <span class="judge-brand-logo__ring judge-brand-logo__ring--1" aria-hidden="true"></span>
+            <span class="judge-brand-logo__ring judge-brand-logo__ring--2" aria-hidden="true"></span>
+            <img src="{{ dashboard_logo_url() }}?v={{ dashboard_logo_version() }}"
+                 alt="Judge Game"
+                 class="judge-brand-logo__img login-brand-logo"
+                 width="120"
+                 height="120">
         </div>
+
+        <div class="login-header">
+            <h4>{{ __('Welcome to Judge control panel') }}</h4>
+            <span class="login-tagline login-tagline--animated">JUSTICE SHALL PREVAIL</span>
+        </div>
+
+        @if (session()->has('success'))
+            <div class="alert alert-success">{{ session('success') }}</div>
+        @endif
+        @if (session()->has('fail'))
+            <div class="alert alert-danger">{{ session('fail') }}</div>
+        @endif
+        @if ($errors->any())
+            <div class="alert alert-danger">
+                <ul class="mb-0">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        <form id="login-form" class="form-horizontal" action="{{ route('admin.login') }}" method="post" novalidate>
+            @csrf
+
+            <div class="modern-input-group">
+                <div class="input-icon-wrap">
+                    <i class="fas fa-envelope field-icon field-icon-end"></i>
+                    <input type="email" id="email" class="modern-input" placeholder="{{ __('email') }}" name="email" value="{{ old('email') }}" required>
+                </div>
+            </div>
+
+            <div class="modern-input-group">
+                <div class="input-icon-wrap">
+                    <i class="fas fa-lock field-icon field-icon-end"></i>
+                    <button type="button" class="field-icon field-icon-start toggle-password" aria-label="Toggle password">
+                        <i class="fas fa-eye" id="toggle-password-icon"></i>
+                    </button>
+                    <input type="password" id="password" class="modern-input" name="password" placeholder="{{ __('password') }}" required style="padding-inline-start: 2.75rem;">
+                </div>
+            </div>
+
+            <button type="submit" class="modern-btn submit_button">
+                <span>{{ __('login') }}</span>
+                <i class="fas {{ app()->getLocale() === 'ar' ? 'fa-arrow-left' : 'fa-arrow-right' }} btn-arrow"></i>
+            </button>
+        </form>
     </div>
-    <!-- END: Content-->
+</div>
 
+<script src="{{ asset('_dashboard/app-assets/vendors/js/vendors.min.js') }}"></script>
+<script>
+(function () {
+    function updateLoginThemeIcon() {
+        var isDark = localStorage.getItem('judge_currentLayout') !== 'light';
+        var iconClass = isDark ? 'icon-sun' : 'icon-moon';
+        var el = document.querySelector('#layout-mode-login');
+        if (el) el.innerHTML = '<i class="ficon feather ' + iconClass + '"></i>';
+    }
 
-    <!-- BEGIN: Vendor JS-->
-    <!-- BEGIN Vendor JS-->
-    <script src="{{ asset('_dashboard/app-assets/vendors/js/vendors.min.js') }}"></script> <!-- END Vendor JS--> <!-- BEGIN: Page Vendor JS--> <!-- END: Page Vendor JS-->
-    <!-- BEGIN: Theme JS-->
-    <script src="{{ asset('_dashboard/app-assets/js/core/app-menu.js') }}"></script>
-    <script src="{{ asset('_dashboard/app-assets/js/core/app.js') }}"></script>
-    <script src="{{ asset('_dashboard/app-assets/js/scripts/components.js') }}"></script> <!-- END: Theme JS-->
-    <!-- END: Theme JS-->
+    function applyLayout(layout) {
+        var body = document.getElementById('content_body');
+        if (layout === 'light') {
+            body.dataset.type = 'light';
+            body.classList.remove('dark-layout');
+            body.classList.add('light-mode');
+        } else {
+            body.dataset.type = 'dark';
+            body.classList.add('dark-layout');
+            body.classList.remove('light-mode');
+        }
+        updateLoginThemeIcon();
+    }
 
-    <!-- BEGIN: Page JS-->
-    <!-- END: Page JS-->
+    var stored = localStorage.getItem('judge_currentLayout');
+    if (!stored) {
+        stored = 'dark';
+        localStorage.setItem('judge_currentLayout', 'dark');
+    }
+    applyLayout(stored);
 
+    document.getElementById('layout-mode-login').addEventListener('click', function (e) {
+        e.preventDefault();
+        var next = localStorage.getItem('judge_currentLayout') === 'light' ? 'dark' : 'light';
+        localStorage.setItem('judge_currentLayout', next);
+        applyLayout(next);
+    });
+
+    document.querySelector('.toggle-password')?.addEventListener('click', function () {
+        var input = document.getElementById('password');
+        var icon = document.getElementById('toggle-password-icon');
+        if (!input) return;
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.replace('fa-eye', 'fa-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.replace('fa-eye-slash', 'fa-eye');
+        }
+    });
+
+    // Subtle star field
+    var canvas = document.getElementById('stars-canvas');
+    if (canvas) {
+        var ctx = canvas.getContext('2d');
+        var stars = [];
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        function initStars() {
+            stars = [];
+            var count = Math.min(120, Math.floor((canvas.width * canvas.height) / 12000));
+            for (var i = 0; i < count; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    r: Math.random() * 1.4 + 0.3,
+                    a: Math.random() * 0.6 + 0.2,
+                    s: Math.random() * 0.02 + 0.005
+                });
+            }
+        }
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            stars.forEach(function (star) {
+                star.a += star.s;
+                if (star.a > 0.85 || star.a < 0.15) star.s *= -1;
+                ctx.beginPath();
+                ctx.fillStyle = 'rgba(196, 163, 90,' + star.a + ')';
+                ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            requestAnimationFrame(draw);
+        }
+        resize();
+        initStars();
+        draw();
+        window.addEventListener('resize', function () {
+            resize();
+            initStars();
+        });
+    }
+})();
+</script>
 </body>
-
-<style>
-    .header-overlay {
-        background-color: rgba(0, 0, 0, 0.5);
-        color: white;
-        padding: 2px;
-    }
-    .header-overlay a{
-        text-decoration: none;
-        color: white;
-        margin-left: 10px;
-        margin-right: 10px;
-    }
-</style>
-
-<!-- END: Body-->
-
 </html>

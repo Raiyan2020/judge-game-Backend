@@ -2,10 +2,14 @@
 
 namespace App\Http\Requests\Admin\RoleTitle;
 
+use App\Enums\GroupRole;
+use App\Http\Requests\Admin\Concerns\UsesAdminAttributes;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rules\Enum;
 
 class StoreRequest extends FormRequest
 {
+    use UsesAdminAttributes;
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -23,24 +27,13 @@ class StoreRequest extends FormRequest
     public function rules(): array
     {
         return [
-             'title' => 'required|array' ,
-            'title.ar' => ['required'],
-            'title.en' => ['required'],
-
-            'role' => ['required'],
-
-            'actions' => ['required', 'array'],
-
-            'actions.*.role_action_id' => [
-                'required',
-                'exists:role_actions,id'
-            ],
-
-            'actions.*.required_count' => [
-                'required',
-                'integer',
-                'min:1'
-            ],
+            'title' => 'required|array',
+            'title.ar' => 'required|string|min:1|max:500',
+            'title.en' => 'required|string|min:1|max:500',
+            'role' => ['required', 'string', 'max:50', new Enum(GroupRole::class)],
+            'actions' => 'required|array|min:1',
+            'actions.*.role_action_id' => 'required|integer|exists:role_actions,id',
+            'actions.*.required_count' => 'required|integer|min:1|max:999999',
         ];
     }
 }

@@ -42,6 +42,7 @@ Route::group(['middleware' => ['auth:admin', 'localization']], function () {
     Route::get('subscriptions', [PackageSubscriptionController::class,'index'])->name('subscriptions.index');
     Route::get('groups', [GroupController::class,'index'])->name('groups.index');
     Route::get('contacts', [ContactController::class,'index'])->name('contacts.index');
+    Route::get('contacts/{contact}', [ContactController::class,'show'])->name('contacts.show');
     Route::delete('contacts/{contact}', [ContactController::class,'destroy'])->name('contacts.destroy');
     Route::PUT('countries/change-status/{country}', [CountryController::class, 'changeStatus'])->name('countries.changeStatus');
     Route::PUT('banners/change-status/{banner}', [BannerController::class, 'changeStatus'])->name('banners.changeStatus');

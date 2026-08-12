@@ -1,91 +1,49 @@
 @extends('dashboard.layout.main')
 @section('title', __('user profile') . ' - ' . $user->name)
 @section('content')
-
-    <div class="content-body">
-        <section id="user-show">
-            <div class="row">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h4 class="card-title">{{ __('user profile') }} - {{ $user->name }}</h4>
-                        </div>
-                        <div class="card-content">
-                            <div class="card-body">
-                                <!-- User Avatar and Basic Info -->
-                                <div class="row mb-4">
-                                    <div class="col-md-3 text-center">
-                                        @if($user->image)
-                                            <img src="{{ $user->image }}" alt="{{ $user->name }}" class="img-fluid rounded-circle" style="max-width: 200px; border: 3px solid #007bff;">
-                                        @else
-                                            <div class="bg-light rounded-circle d-flex align-items-center justify-content-center" style="width: 200px; height: 200px; margin: 0 auto;">
-                                                <i class="feather icon-user" style="font-size: 80px; color: #ccc;"></i>
-                                            </div>
-                                        @endif
-                                        <h5 class="mt-3">{{ $user->name }}</h5>
-                                    </div>
-
-                                    <div class="col-md-9">
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <p><strong>{{ __('phone') }}:</strong> {{ $user->full_phone ?? '-' }}</p>
-                                            </div>
-                                            
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <hr>
-
-                             
-
-                                <hr>
-
-                    
-
-
-                                <!-- Timeline Information -->
-                                <div class="row mb-4">
-                                    <div class="col-md-12">
-                                        <h5>{{ __('timeline') }}</h5>
-                                        <div class="row">
-                                            <div class="col-md-4">
-                                                <p><strong>{{ __('created at') }}:</strong> 
-                                                    <br>{{ $user->created_at->format('Y-m-d H:i:s') }}
-                                                </p>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <p><strong>{{ __('updated at') }}:</strong> 
-                                                    <br>{{ $user->updated_at->format('Y-m-d H:i:s') }}
-                                                </p>
-                                            </div>
-                                            @if($user->deleted_at)
-                                                <div class="col-md-4">
-                                                    <p><strong>{{ __('deleted at') }}:</strong> 
-                                                        <br>{{ $user->deleted_at->format('Y-m-d H:i:s') }}
-                                                    </p>
-                                                </div>
-                                            @endif
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <hr>
-
-                                <!-- Action Buttons -->
-                                <div class="row mt-4">
-                                    <div class="col-md-12">
-                                       
-                                        <a href="{{ route('admin.users.index') }}" class="btn btn-secondary waves-effect waves-light">
-                                            <i class="feather icon-arrow-left"></i> {{ __('back') }}
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-    </div>
+    @include('dashboard.partials.show-page', [
+        'title' => __('user profile') . ' - ' . $user->name,
+        'backUrl' => route('admin.users.index'),
+        'sections' => [
+            [
+                'title' => __('basic information'),
+                'rows' => [
+                    ['label' => __('name'), 'value' => $user->name],
+                    ['label' => __('user name'), 'value' => $user->username ?? '-'],
+                    ['label' => __('nickname'), 'value' => $user->nickname ?? '-'],
+                    ['label' => __('gender'), 'value' => $user->gender ? __($user->gender) : '-'],
+                    ['label' => __('status'), 'value' => $user->status ? __($user->status) : '-'],
+                ],
+            ],
+            [
+                'title' => __('contact information'),
+                'rows' => [
+                    ['label' => __('phone code'), 'value' => $user->country_code ?? '-'],
+                    ['label' => __('phone'), 'value' => $user->phone ?? '-'],
+                    ['label' => __('full phone'), 'value' => $user->full_phone ?? '-'],
+                    ['label' => __('language'), 'value' => $user->language ? __($user->language) : '-'],
+                ],
+            ],
+            [
+                'title' => __('media and images'),
+                'col' => 'col-lg-6',
+                'rows' => [
+                    [
+                        'label' => __('image'),
+                        'value' => $user->image
+                            ? view('dashboard.partials.show-image', ['url' => $user->image])->render()
+                            : __('no image'),
+                    ],
+                ],
+            ],
+            [
+                'title' => __('timeline'),
+                'col' => 'col-lg-6',
+                'rows' => [
+                    ['label' => __('created at'), 'value' => optional($user->created_at)->format('Y-m-d H:i')],
+                    ['label' => __('updated at'), 'value' => optional($user->updated_at)->format('Y-m-d H:i')],
+                ],
+            ],
+        ],
+    ])
 @endsection

@@ -2,10 +2,12 @@
 
 namespace App\Http\Requests\Admin\LastUpdate;
 
+use App\Http\Requests\Admin\Concerns\UsesAdminAttributes;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreRequest extends FormRequest
 {
+    use UsesAdminAttributes;
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -26,10 +28,10 @@ class StoreRequest extends FormRequest
             'title.ar'=>'required|string|min:1|max:255',
             'title.en'=>'required|string|min:1|max:255',
             'description' => 'required|array',
-            'description.ar'=>'required|string|min:1|max:255',
-            'description.en'=>'required|string|min:1|max:255',
-            'version' => 'required|numeric|min:0',
-            'display_speed' => 'required|numeric|min:0',
+            'description.ar' => 'required|string|min:1|max:5000',
+            'description.en' => 'required|string|min:1|max:5000',
+            'version' => 'required|numeric|min:0|max:999999',
+            'display_speed' => 'required|integer|min:0|max:86400',
             'image'=>[request()->isMethod('post') ? 'required' : 'sometimes','image'],
         ];
     }

@@ -41,6 +41,16 @@ class RoleTitleController extends Controller
     }
 
     /**
+     * Display the specified resource.
+     */
+    public function show(RoleTitle $roleTitle)
+    {
+        $roleTitle->load('requirements.action');
+
+        return view('dashboard.role-titles.show', ['roleTitle' => $roleTitle]);
+    }
+
+    /**
      * Show the form for editing the specified resource.
      */
     public function edit(RoleTitle $roleTitle)

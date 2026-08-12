@@ -44,9 +44,9 @@ class LastUpdateController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(LastUpdate $lastUpdate)
     {
-        //
+        return view('dashboard.last-updates.show', ['lastUpdate' => $lastUpdate]);
     }
 
     /**

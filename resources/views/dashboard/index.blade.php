@@ -1,96 +1,105 @@
 @extends('dashboard.layout.main')
+
 @push('styles')
-    <link rel="stylesheet" href="{{ asset('_dashboard/app-assets/vendors/css/charts/apexcharts.css') }}">
+    <link rel="stylesheet" href="{{ asset('_dashboard/assets/css/dashboard-charts.css') }}?v={{ filemtime(public_path('_dashboard/assets/css/dashboard-charts.css')) }}">
 @endpush
+
 @section('title', __('main page'))
 
 @section('content')
+    <div class="dashboard-home">
+        <section class="dash-welcome mb-2">
+            <div class="dash-welcome__inner">
+                <svg class="dash-welcome__seal" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+                    <path d="M32 8v44" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                    <path d="M18 18h28" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                    <path d="M12 24h16l4 10H12V24z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                    <path d="M36 24h16l-4 10H36V24z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                    <path d="M24 52h16" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                </svg>
+                <div class="dash-welcome__content">
+                    <p class="dash-welcome__greeting">{{ $welcome['greeting'] }}</p>
+                    <h1 class="dash-welcome__name">{{ $welcome['name'] }}</h1>
+                    <p class="dash-welcome__subtitle">{{ __('Welcome to Judge control panel') }}</p>
 
-    <div class="content-header row">
-    </div>
-    <div class="content-body">
-        <!-- Dashboard Analytics Start -->
-        <section id="dashboard-analytics">
-            <div class="row">
-                <div class="col-lg-12 col-md-12 col-sm-12">
-                    <div class="card bg-analytics text-white">
-                        <div class="card-content">
-                            <div class="card-body text-center">
-                                <img src="{{ asset('_dashboard/app-assets/images/elements/decore-left.png') }}"
-                                    class="img-left" alt="card-img-left">
-                                <img src="{{ asset('_dashboard/app-assets/images/elements/decore-right.png') }}"
-                                    class="img-right" alt="card-img-right">
-                                <div class="avatar avatar-xl bg-primary shadow mt-0">
-                                    <div class="avatar-content">
-                                        <i class="feather icon-award white font-large-1"></i>
-                                    </div>
-                                </div>
-                                <div class="text-center">
-                                    <h1 class="mb-2 text-black-50">{{ __('welcome') }} {{ auth('admin')->user()->name }}</h1>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="dash-welcome__badges">
+                        <span class="dash-welcome__badge">
+                            <i class="feather icon-monitor"></i>
+                            <span>{{ __('System is running') }}</span>
+                        </span>
+                        <a href="{{ route('admin.groups.index') }}" class="dash-welcome__badge dash-welcome__badge--link">
+                            <i class="feather icon-users"></i>
+                            <span>{{ __('groups') }}: {{ number_format($welcome['groups_count']) }}</span>
+                        </a>
+                        <a href="{{ route('admin.users.index') }}" class="dash-welcome__badge dash-welcome__badge--link">
+                            <i class="feather icon-user-plus"></i>
+                            <span>{{ __('New users today') }}: {{ number_format($welcome['new_users_today']) }}</span>
+                        </a>
                     </div>
                 </div>
 
-                {{-- <div class="col-xl-2 col-md-4 col-sm-6">
-                    <div class="card text-center">
-                        <div class="card-content">
-                            <div class="card-body">
-                                <div class="avatar bg-rgba-danger p-50 m-0 mb-1">
-                                    <div class="avatar-content">
-                                        <i class="fa fa-user text-danger fa-2x"></i>
-                                    </div>
-                                </div>
-                                <h2 class="text-bold-700">{{ $usersCount }}</h2>
-                                <p class="mb-0 line-ellipsis"> {{ __('users') }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-xl-2 col-md-4 col-sm-6">
-                    <div class="card text-center">
-                        <div class="card-content">
-                            <div class="card-body">
-                                <div class="avatar bg-rgba-danger p-50 m-0 mb-1">
-                                    <div class="avatar-content">
-                                        <i class="fa fa-product-hunt text-danger fa-2x"></i>
-                                    </div>
-                                </div>
-                                <h2 class="text-bold-700">{{ $productsCount }}</h2>
-                                <p class="mb-0 line-ellipsis"> {{ __('products') }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-              
-              
-                <div class="col-xl-2 col-md-4 col-sm-6">
-                    <div class="card text-center">
-                        <div class="card-content">
-                            <div class="card-body">
-                                <div class="avatar bg-rgba-danger p-50 m-0 mb-1">
-                                    <div class="avatar-content">
-                                        <i class="fa fa-calendar-check text-danger fa-2x"></i>
-                                    </div>
-                                </div>
-                                <h2 class="text-bold-700">{{ $ordersCount }}</h2>
-                                <p class="mb-0 line-ellipsis"> {{ __('orders') }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div> --}}
-             
-                 
-           
-
+                <aside class="dash-welcome__date" aria-label="{{ $welcome['month_year'] }}">
+                    <span class="dash-welcome__day">{{ $welcome['day'] }}</span>
+                    <span class="dash-welcome__month">{{ $welcome['month_year'] }}</span>
+                </aside>
             </div>
-
-
-
         </section>
-        <!-- Dashboard Analytics end -->
+
+        @php
+            $statMax = max(1, collect($menus)->max('count'));
+            $statGroups = collect($menus)->groupBy(fn ($menu) => $menu['group'] ?? 'content');
+            $statSections = [
+                'users' => __('Users section'),
+                'content' => __('Content section'),
+            ];
+            $statIndex = 0;
+        @endphp
+
+        @foreach ($statSections as $groupKey => $groupTitle)
+            @php $groupItems = $statGroups->get($groupKey); @endphp
+            @if ($groupItems && $groupItems->count())
+                <div class="dash-stat-section mb-2">
+                    <h3 class="dash-stat-section__title">
+                        <span class="dash-stat-section__dot"></span>
+                        {{ $groupTitle }}
+                    </h3>
+                    <div class="row dash-stat-grid">
+                        @foreach ($groupItems as $menu)
+                            @php
+                                $ratio = (int) round(min(100, max(6, ($menu['count'] / $statMax) * 100)));
+                                $statIndex++;
+                            @endphp
+                            <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 dash-stat-col">
+                                <a href="{{ $menu['url'] }}" class="dash-stat-link">
+                                    <article class="dash-stat-card" style="--bar: {{ $ratio }}%; --stat-delay: {{ $statIndex * 0.05 }}s">
+                                        <div class="dash-stat-card__head">
+                                            <div class="dash-stat-card__icon">
+                                                <i class="feather {{ $menu['icon'] }}"></i>
+                                            </div>
+                                            <span class="dash-stat-card__chip">
+                                                <i class="feather icon-trending-up"></i>
+                                                {{ $ratio }}%
+                                            </span>
+                                        </div>
+                                        <div class="dash-stat-card__body">
+                                            <p class="dash-stat-card__title">{{ $menu['name'] }}</p>
+                                            <h2 class="dash-stat-card__value">{{ number_format($menu['count']) }}</h2>
+                                            <p class="dash-stat-card__sub">{{ __('total') }}</p>
+                                        </div>
+                                        <span class="dash-stat-card__bar" aria-hidden="true">
+                                            <span class="dash-stat-card__bar-fill"></span>
+                                        </span>
+                                        <div class="dash-stat-card__footer">
+                                            <span class="dash-stat-card__action">{{ __('view') }}</span>
+                                            <i class="feather icon-chevron-left dash-stat-card__arrow"></i>
+                                        </div>
+                                    </article>
+                                </a>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+        @endforeach
     </div>
-
 @endsection
-

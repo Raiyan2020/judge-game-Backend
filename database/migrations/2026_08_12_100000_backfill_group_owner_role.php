@@ -22,14 +22,14 @@ return new class extends Migration
               ON keep.group_id = gu.group_id
              AND keep.user_id  = gu.user_id
              AND keep.id       < gu.id
-            JOIN groups g ON g.id = gu.group_id
+            JOIN `groups` g ON g.id = gu.group_id
             WHERE gu.user_id = g.user_id
         ");
 
         // 2) Force the owner's remaining row to the judge role/title, accepted.
         DB::statement("
             UPDATE group_user gu
-            JOIN groups g ON g.id = gu.group_id
+            JOIN `groups` g ON g.id = gu.group_id
             SET gu.role = 'judge', gu.title = 'judge', gu.status = 'accepted'
             WHERE gu.user_id = g.user_id
         ");

@@ -96,7 +96,7 @@ class CouponDataTable extends DataTable
        return [
             Column::computed('DT_RowIndex')->title('#'),
             Column::make('code')->title(__('code')),
-            Column::computed('discount')->title(__('percentage')),
+            Column::make('discount')->title(__('percentage')),
             Column::make('start_at')->title(__('start at')),
             Column::make('end_at')->title(__('end at')),
             Column::computed('status')->title(__('status')),

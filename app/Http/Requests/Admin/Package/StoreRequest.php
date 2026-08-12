@@ -3,10 +3,12 @@
 namespace App\Http\Requests\Admin\Package;
 
 use App\Enum\PackageAdsType;
+use App\Http\Requests\Admin\Concerns\UsesAdminAttributes;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreRequest extends FormRequest
 {
+    use UsesAdminAttributes;
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -29,8 +31,8 @@ class StoreRequest extends FormRequest
             'description' => 'required|array' ,
             'description.ar'=>'required|string|min:1|max:1000',
             'description.en'=>'required|string|min:1|max:1000',
-            'price'=>'required|numeric|min:1',
-            'duration_days'=>'required|numeric|min:1',
+            'price' => 'required|numeric|min:1|max:9999999',
+            'duration_days' => 'required|integer|min:1|max:3650',
             'most_sale'=>'nullable|boolean'
         ];
     }

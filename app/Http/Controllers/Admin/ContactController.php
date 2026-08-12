@@ -21,6 +21,12 @@ class ContactController extends Controller
         return $dataTable->render('dashboard.contacts.index');
 
     }
+
+    public function show(Contact $contact)
+    {
+        return view('dashboard.contacts.show', ['contact' => $contact]);
+    }
+
      /**
      * Remove the specified resource from storage.
      */

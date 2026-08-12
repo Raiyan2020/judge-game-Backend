@@ -29,6 +29,14 @@ class GroupDataTable extends DataTable
             ->addColumn('owner', function ($group) {
                 return $group->owner ? $group->owner->name : '';
             })
+            ->filterColumn('name', function ($query, $keyword) {
+                $query->where('groups.name', 'like', "%{$keyword}%");
+            })
+            ->filterColumn('owner', function ($query, $keyword) {
+                $query->whereHas('owner', function ($ownerQuery) use ($keyword) {
+                    $ownerQuery->where('name', 'like', "%{$keyword}%");
+                });
+            })
 
             ->addIndexColumn()
             ->rawColumns(['name', 'image', 'owner'])
@@ -99,7 +107,7 @@ class GroupDataTable extends DataTable
             Column::computed('DT_RowIndex')->title('#'),
             Column::computed('name')->title(__('name'))->searchable(),
             Column::computed('image')->title(__('image')),
-            Column::computed('owner')->title(__('owner')),
+            Column::computed('owner')->title(__('owner'))->searchable(),
             Column::computed('accepted_users_count')->title(__('members count')),
             Column::computed('legal_cases_count')->title(__('legal cases count')),
 

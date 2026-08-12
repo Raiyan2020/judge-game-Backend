@@ -25,6 +25,12 @@ class LastUpdateDataTable extends DataTable
          ->addColumn('title', function ($lastUpdate) {
             return $lastUpdate->title;
          })
+        ->filterColumn('title', function ($query, $keyword) {
+            $query->where(function ($q) use ($keyword) {
+                $q->whereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(title, '$.en'))) like LOWER(?)", ["%$keyword%"])
+                    ->orWhereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(title, '$.ar'))) like LOWER(?)", ["%$keyword%"]);
+            });
+        })
         ->addColumn('status', function ($lastUpdate) {
             return view('dashboard.last-updates.status', ['lastUpdate' => $lastUpdate]);
         })
@@ -87,8 +93,8 @@ class LastUpdateDataTable extends DataTable
     {
         return [
             Column::computed('DT_RowIndex')->title('#'),
-            Column::computed('title')->title(__('title')),
-            Column::computed('version')->title(__('version')),
+            Column::computed('title')->title(__('title'))->searchable(),
+            Column::make('version')->title(__('version')),
             Column::computed('image')->title(__('image')),
             Column::computed('status')->title(__('status')),
             Column::computed('action')->title(__('actions')),

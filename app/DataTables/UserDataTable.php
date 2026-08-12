@@ -20,6 +20,15 @@ class UserDataTable extends DataTable
     {
         return (new EloquentDataTable($query))
         ->addColumn('action', 'dashboard.users.action')
+        ->filterColumn('name', function ($query, $keyword) {
+            $query->where('users.name', 'like', "%{$keyword}%");
+        })
+        ->filterColumn('username', function ($query, $keyword) {
+            $query->where('users.username', 'like', "%{$keyword}%");
+        })
+        ->filterColumn('full_phone', function ($query, $keyword) {
+            $query->where('users.full_phone', 'like', "%{$keyword}%");
+        })
         ->addIndexColumn()
         ->setRowId('id')
         ->rawColumns(['action']);

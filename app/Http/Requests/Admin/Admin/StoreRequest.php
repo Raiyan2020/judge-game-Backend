@@ -2,10 +2,12 @@
 
 namespace App\Http\Requests\Admin\Admin;
 
+use App\Http\Requests\Admin\Concerns\UsesAdminAttributes;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreRequest extends FormRequest
 {
+    use UsesAdminAttributes;
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -22,10 +24,10 @@ class StoreRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name'=>'required|string',
-            'email'=>'required|email|unique:admins,email',
-            'phone'=>'required|string|min:6|max:20|unique:admins,phone',
-            'password'=>'required|string|min:6',
+            'name' => 'required|string|min:2|max:255',
+            'email' => 'required|string|email|max:255|unique:admins,email',
+            'phone' => 'required|string|min:6|max:20|unique:admins,phone',
+            'password' => 'required|string|min:6|max:255',
         ];
     }
 }

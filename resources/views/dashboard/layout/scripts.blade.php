@@ -216,4 +216,38 @@
 <!-- BEGIN: Page JS-->
 @include('sweetalert::alert')
 <!-- END: Page JS-->
+
+<script>
+$(function () {
+    var currentLayout = localStorage.getItem('judge_currentLayout');
+
+    if (currentLayout === null) {
+        currentLayout = 'dark';
+        localStorage.setItem('judge_currentLayout', 'dark');
+    }
+
+    $('#content_body').data('type', currentLayout);
+
+    if (currentLayout === 'light') {
+        $('#layout-mode').html('<i class="ficon feather icon-moon" onclick="changeMode()"></i>');
+        $('#content_body').removeClass('dark-layout').addClass('light-mode');
+    } else {
+        $('#layout-mode').html('<i class="ficon feather icon-sun" onclick="changeMode()"></i>');
+        $('#content_body').addClass('dark-layout').removeClass('light-mode');
+    }
+});
+
+function changeMode() {
+    var layoutOptions = $('#content_body').data('type');
+    if (layoutOptions == 'dark') {
+        localStorage.setItem('judge_currentLayout', 'light');
+        $('#content_body').data('type', 'light').removeClass('dark-layout').addClass('light-mode');
+        $('#layout-mode').html('<i class="ficon feather icon-moon" onclick="changeMode()"></i>');
+    } else {
+        localStorage.setItem('judge_currentLayout', 'dark');
+        $('#content_body').data('type', 'dark').addClass('dark-layout').removeClass('light-mode');
+        $('#layout-mode').html('<i class="ficon feather icon-sun" onclick="changeMode()"></i>');
+    }
+}
+</script>
 @livewireScripts

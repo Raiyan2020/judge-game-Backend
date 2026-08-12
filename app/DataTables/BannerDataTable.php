@@ -27,9 +27,11 @@ class BannerDataTable extends DataTable
          ->addColumn('image', function ($banner) {
             return " <img src='{$banner->image}'  width='75' height='75'>";
         })
-        ->filterColumn('name', function ($query, $keyword) {
-            $query->whereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(title, '$.en'))) like LOWER(?)", ["%$keyword%"])
-            ->orWhereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(title, '$.ar'))) like LOWER(?)", ["%$keyword%"]);
+        ->filterColumn('title', function ($query, $keyword) {
+            $query->where(function ($q) use ($keyword) {
+                $q->whereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(title, '$.en'))) like LOWER(?)", ["%$keyword%"])
+                    ->orWhereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(title, '$.ar'))) like LOWER(?)", ["%$keyword%"]);
+            });
         })
        
          ->addColumn('title', function ($banner) {
@@ -38,11 +40,8 @@ class BannerDataTable extends DataTable
         ->addColumn('status', function ($banner) {
             return view('dashboard.banners.status', ['banner' => $banner]);
         })
-        ->addColumn('image', function ($banner) {
-            return " <img src='{$banner->image}'  width='75' height='75'>";
-        })
         ->addIndexColumn()
-       ->rawColumns(['image','action','status','type','title'])
+       ->rawColumns(['image','action','status','title'])
             ->setRowId('id');
     }
 

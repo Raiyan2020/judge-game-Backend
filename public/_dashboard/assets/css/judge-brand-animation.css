@@ -1,0 +1,133 @@
+/* Judge Game — brand animations (gavel tap + court seal pulse) */
+
+.judge-brand-logo {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.judge-brand-logo__ring {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    border-radius: 50%;
+    border: 1px solid rgba(196, 163, 90, 0.28);
+    pointer-events: none;
+    animation: judgeSealPulse 3.2s ease-in-out infinite;
+}
+
+.judge-brand-logo__ring--1 {
+    width: 100%;
+    height: 100%;
+}
+
+.judge-brand-logo__ring--2 {
+    width: 118%;
+    height: 118%;
+    animation-delay: 0.6s;
+    opacity: 0.45;
+}
+
+.judge-brand-logo__img {
+    position: relative;
+    z-index: 1;
+    transform-origin: 50% 88%;
+    animation: judgeGavelTap 4.5s ease-in-out infinite;
+}
+
+.judge-brand-logo--login .judge-brand-logo__ring--1 {
+    width: 108%;
+    height: 108%;
+}
+
+.judge-brand-logo--login .judge-brand-logo__ring--2 {
+    width: 128%;
+    height: 128%;
+}
+
+.sidebar-logo.judge-brand-logo,
+.main-menu .navbar-header .navbar-brand.sidebar-logo.judge-brand-logo {
+    width: 96px;
+    height: 96px;
+}
+
+.menu-collapsed .main-menu:not(.expanded) .sidebar-logo.judge-brand-logo,
+.menu-collapsed .main-menu:not(.expanded) .navbar-header .navbar-brand.sidebar-logo.judge-brand-logo {
+    width: 40px;
+    height: 40px;
+}
+
+.login-tagline--animated {
+    animation: judgeJusticeGlow 3s ease-in-out infinite;
+}
+
+.dash-welcome__seal {
+    position: absolute;
+    top: 1.25rem;
+    inset-inline-end: 1.25rem;
+    width: 52px;
+    height: 52px;
+    color: rgba(196, 163, 90, 0.85);
+    opacity: 0.55;
+    animation: judgeScalesSway 5s ease-in-out infinite;
+    pointer-events: none;
+}
+
+.dash-welcome__inner {
+    position: relative;
+}
+
+@keyframes judgeGavelTap {
+    0%, 86%, 100% {
+        transform: rotate(0deg) translateY(0);
+    }
+    90% {
+        transform: rotate(-7deg) translateY(1px);
+    }
+    94% {
+        transform: rotate(2deg) translateY(0);
+    }
+}
+
+@keyframes judgeSealPulse {
+    0%, 100% {
+        transform: scale(0.96);
+        opacity: 0.25;
+    }
+    50% {
+        transform: scale(1.06);
+        opacity: 0.65;
+    }
+}
+
+@keyframes judgeJusticeGlow {
+    0%, 100% {
+        opacity: 0.75;
+        letter-spacing: 0.18em;
+        text-shadow: 0 0 0 transparent;
+    }
+    50% {
+        opacity: 1;
+        letter-spacing: 0.22em;
+        text-shadow: 0 0 14px rgba(196, 163, 90, 0.35);
+    }
+}
+
+@keyframes judgeScalesSway {
+    0%, 100% {
+        transform: rotate(-4deg);
+    }
+    50% {
+        transform: rotate(4deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .judge-brand-logo__ring,
+    .judge-brand-logo__img,
+    .login-tagline--animated,
+    .dash-welcome__seal {
+        animation: none !important;
+    }
+}

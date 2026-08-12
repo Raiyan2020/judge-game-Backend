@@ -21,8 +21,10 @@ class PackageDataTable extends DataTable
         return (new EloquentDataTable($query))
             ->addColumn('action', 'dashboard.packages.action')
             ->filterColumn('name', function ($query, $keyword) {
-                $query->whereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(name, '$.en'))) like LOWER(?)", ["%$keyword%"])
-                    ->orWhereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(name, '$.ar'))) like LOWER(?)", ["%$keyword%"]);
+                $query->where(function ($q) use ($keyword) {
+                    $q->whereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(name, '$.en'))) like LOWER(?)", ["%$keyword%"])
+                        ->orWhereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(name, '$.ar'))) like LOWER(?)", ["%$keyword%"]);
+                });
             })
             ->addColumn('name', function ($package) {
                 return $package->name;

@@ -2,10 +2,12 @@
 
 namespace App\Http\Requests\Admin\Admin;
 
+use App\Http\Requests\Admin\Concerns\UsesAdminAttributes;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateRequest extends FormRequest
 {
+    use UsesAdminAttributes;
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -22,13 +24,11 @@ class UpdateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => 'required|string',
-            'email' => 'required|email:dns|unique:admins,email,' . object_get($this->route('admin'), 'id') . ',id',
-            'password' => 'nullable|string|min:6',
-            'phone'=>'required|string|min:6|max:20|unique:admins,phone,' . object_get($this->route('admin'), 'id') . ',id',
-            'is_active'=>'required|in:0,1',
-
-
+            'name' => 'required|string|min:2|max:255',
+            'email' => 'required|string|email:dns|max:255|unique:admins,email,' . object_get($this->route('admin'), 'id') . ',id',
+            'password' => 'nullable|string|min:6|max:255',
+            'phone' => 'required|string|min:6|max:20|unique:admins,phone,' . object_get($this->route('admin'), 'id') . ',id',
+            'is_active' => 'required|in:0,1',
         ];
     }
 }

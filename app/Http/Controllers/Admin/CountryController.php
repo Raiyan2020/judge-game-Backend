@@ -46,7 +46,7 @@ class CountryController extends Controller
      */
     public function show(Country $country)
     {
-        //
+        return view('dashboard.countries.show', ['country' => $country]);
     }
 
     /**

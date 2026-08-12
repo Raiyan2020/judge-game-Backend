@@ -24,6 +24,12 @@ class TipDataTable extends DataTable
          ->addColumn('description', function ($tip) {
             return $tip->description;
          })
+        ->filterColumn('description', function ($query, $keyword) {
+            $query->where(function ($q) use ($keyword) {
+                $q->whereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(description, '$.en'))) like LOWER(?)", ["%$keyword%"])
+                    ->orWhereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(description, '$.ar'))) like LOWER(?)", ["%$keyword%"]);
+            });
+        })
         ->addColumn('status', function ($tip) {
             return view('dashboard.tips.status', ['tip' => $tip]);
         })
@@ -86,7 +92,7 @@ class TipDataTable extends DataTable
     {
         return [
             Column::computed('DT_RowIndex')->title('#'),
-            Column::computed('description')->title(__('description')),
+            Column::computed('description')->title(__('description'))->searchable(),
             Column::computed('image')->title(__('image')),
             Column::computed('status')->title(__('status')),
             Column::computed('action')->title(__('actions')),

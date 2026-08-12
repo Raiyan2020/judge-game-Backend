@@ -44,6 +44,12 @@ class GroupController extends Controller
        return \responder::success(new GroupResource($group));
    }
 
+   public function destroy(Group $group)
+   {
+       $this->groupService->deleteGroup($group);
+       return \responder::success(__('Group deleted successfully'));
+   }
+
    public function myGroups()
    {
        $groups = $this->groupService->getUserGroups();

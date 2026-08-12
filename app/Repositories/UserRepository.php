@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 
+use App\Models\Point;
 use App\Models\User;
 
 class UserRepository extends BaseRepository
@@ -34,13 +35,7 @@ class UserRepository extends BaseRepository
 
     public function usersByRoleRank($request)
     {
-        $column = match ($request->role) {
-            'judge'      => 'judge_points',
-            'lawyer'     => 'lawyer_points',
-            'consultant' => 'consultant_points',
-            'citizen'    => 'citizen_points',
-            default      => 'total_points',
-        };
+        $column = $this->pointsColumnForRole($request->role);
 
         // `points` is a VIEW over `point_transactions`, and nothing writes that
         // table yet — so an INNER join eliminated every row and the board came
@@ -65,7 +60,12 @@ class UserRepository extends BaseRepository
                         ->where('group_user.status', 'accepted');
                 });
             })
+            // Deterministic tiebreak: equal scores order by id, so the board is
+            // stable AND agrees with `rankInRoleBoard` (which counts `id <` on a
+            // tie). Without it, ties order arbitrarily and a user's profile rank
+            // could disagree with their row here.
             ->orderByRaw($sort . ' desc')
+            ->orderBy('users.id')
             ->select('users.*')
             ->get();
 
@@ -98,6 +98,80 @@ class UserRepository extends BaseRepository
         return in_array($role, ['judge', 'lawyer', 'consultant', 'citizen'], true)
             ? $role
             : null;
+    }
+
+    /**
+     * The points column a leaderboard sorts by for [$role]; `total_points` for
+     * an unknown/absent role (the "everyone" board).
+     */
+    public function pointsColumnForRole(?string $role): string
+    {
+        return match ($role) {
+            'judge'      => 'judge_points',
+            'lawyer'     => 'lawyer_points',
+            'consultant' => 'consultant_points',
+            'citizen'    => 'citizen_points',
+            default      => 'total_points',
+        };
+    }
+
+    /**
+     * The user's 1-based position on the [$role] leaderboard — the SAME board
+     * `usersByRoleRank` renders, so a profile rank agrees with the ranking
+     * screen. [$local] false = the global board; true = the same-country board.
+     * Counts everyone strictly ahead — higher role points, ties broken by
+     * smaller id (matching the board's `orderBy('users.id')`) — plus 1.
+     */
+    public function rankInRoleBoard(User $user, ?string $role, bool $local): int
+    {
+        $column = $this->pointsColumnForRole($role);
+        $myScore = (int) (Point::where('user_id', $user->id)->value($column) ?? 0);
+        $myId = (int) $user->id;
+
+        $ahead = $this->model
+            ->newQuery()
+            ->leftJoin('points', 'users.id', '=', 'points.user_id')
+            ->when($local, function ($q) use ($user) {
+                // Prefer country_id (matches the board's country filter). Fall
+                // back to country_code when it is unset, so a user with no
+                // country_id still gets a real LOCAL rank instead of one that
+                // silently equals their global rank (country_id is nullable).
+                if ($user->country_id !== null) {
+                    $q->where('users.country_id', $user->country_id);
+                } else {
+                    $q->where('users.country_code', $user->country_code);
+                }
+            })
+            ->when($this->rankableRole($role), function ($q, $r) {
+                $q->whereHas('groups', function ($group) use ($r) {
+                    $group->where('group_user.role', $r)
+                        ->where('group_user.status', 'accepted');
+                });
+            })
+            ->whereRaw(
+                '(COALESCE(points.' . $column . ', 0) > ? '
+                . 'OR (COALESCE(points.' . $column . ', 0) = ? AND users.id < ?))',
+                [$myScore, $myScore, $myId]
+            )
+            ->count();
+
+        return $ahead + 1;
+    }
+
+    /**
+     * The roles a user holds (accepted) across their groups, distinct. Empty
+     * when they hold none — then only the "everyone" board applies.
+     *
+     * @return array<int,string>
+     */
+    public function acceptedRolesOf(User $user): array
+    {
+        return \Illuminate\Support\Facades\DB::table('group_user')
+            ->where('user_id', $user->id)
+            ->where('status', 'accepted')
+            ->distinct()
+            ->pluck('role')
+            ->all();
     }
 
     /**

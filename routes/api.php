@@ -74,11 +74,9 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::get('notifications', [NotificationController::class, 'index']);
         Route::post('notifications/mark-read', [NotificationController::class, 'markAsRead']);
 
-        Route::apiResource('groups', GroupController::class)->only(['index', 'store', 'update']);
+        Route::apiResource('groups', GroupController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::get('my-groups', [GroupController::class, 'myGroups']);
         Route::get('my-invitations', [GroupController::class, 'myInvitations']);
-        Route::delete('groups/{group}/members/{userId}', [GroupController::class, 'removeMember']);
-        Route::patch('groups/{group}/members/{userId}/role', [GroupController::class, 'changeRole']);
         // Group-scoped reads are members-only: without `groupMember` any
         // signed-in user could dump any group's members (phone numbers
         // included), laws, cases and statistics by guessing the id.

@@ -25,6 +25,34 @@ class GroupService
         return $this->repo->createGroupWithJudge($request, $judgeId);
     }
 
+    /**
+     * Delete a group. Owner-only, and refused while the group still has any
+     * non-closed case (same spirit as "cannot act with open cases as a party").
+     * Every child relation (members pivot, chat + messages, laws + requests,
+     * permissions, titles, closed cases) has an ON DELETE CASCADE, so the single
+     * delete cleans them all up atomically.
+     */
+    public function deleteGroup(Group $group): void
+    {
+        if ((int) $group->user_id !== (int) auth()->id()) {
+            throw ValidationException::withMessages([
+                __('Only the group owner can delete the group'),
+            ]);
+        }
+
+        $hasOpenCases = $group->legalCases()
+            ->where('status', '!=', LegalCaseStatus::CLOSED->value)
+            ->exists();
+
+        if ($hasOpenCases) {
+            throw ValidationException::withMessages([
+                __('Cannot delete a group that still has open cases'),
+            ]);
+        }
+
+        $group->delete();
+    }
+
     public function getUserGroups()
     {
         $groups = $this->repo->getUserGroupsWithRoles(auth('sanctum')->user());

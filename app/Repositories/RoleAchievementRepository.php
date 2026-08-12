@@ -307,6 +307,13 @@ class RoleAchievementRepository
         Group $group,
         string $role
     ): int {
+        // `baseCaseQuery` already scopes to cases where THIS user participates as
+        // the consultant, so "the consultant issued a judgment instead of the
+        // judge" is simply: a judgment on the case whose `judged_by` is the user.
+        // The old form nested `whereHas('legalCase')->whereHas('participants')`
+        // with a `whereColumn` reaching two levels up to `legal_case_judgments`,
+        // which Laravel aliases away → an "Unknown column" 500 for every
+        // consultant. This flat form is equivalent and can't alias-break.
         return $this->baseCaseQuery(
             $user,
             $group,
@@ -314,26 +321,8 @@ class RoleAchievementRepository
         )
             ->whereHas(
                 'judgments',
-                function ($query) {
-                    $query->whereHas(
-                        'legalCase',
-                        function ($query) {
-                            $query->whereHas(
-                                'participants',
-                                function ($query) {
-                                    $query
-                                        ->where(
-                                            'role',
-                                            CaseRole::CONSULTANT->value
-                                        )
-                                        ->whereColumn(
-                                            'legal_case_parties.user_id',
-                                            'legal_case_judgments.judged_by'
-                                        );
-                                }
-                            );
-                        }
-                    );
+                function ($query) use ($user) {
+                    $query->where('judged_by', $user->id);
                 }
             )
             ->count();

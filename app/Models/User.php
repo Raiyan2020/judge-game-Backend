@@ -66,24 +66,65 @@ class User extends Authenticatable
         return $this->hasOne(Point::class);
     }
 
-    public function globalRank(): int
-    {
-        $myPoints = $this->points?->total_points ?? 0;
+    /**
+     * Memoized so `globalRank()` and `localRank()` (called separately by
+     * `UserResource`) agree on the SAME chosen role.
+     *
+     * @var array{global:int,local:int}|null
+     */
+    private ?array $rankCache = null;
 
-        return Point::where('total_points', '>', $myPoints)->count() + 1;
+    /**
+     * The user's global + local rank, computed the SAME way the ranking screen
+     * ranks (`UserRepository::usersByRoleRank` — positional, per role, local by
+     * `country_id`), so the profile card matches the board instead of the old
+     * "count strictly greater by total_points + 1", which collapsed to 1 for
+     * everyone while no points are awarded.
+     *
+     * A user can hold several roles across groups; we report their BEST-standing
+     * role (lowest global position) and that same role's local position. With no
+     * group role we fall back to the everyone board (total_points).
+     *
+     * @return array{global:int,local:int}
+     */
+    private function computeRanks(): array
+    {
+        if ($this->rankCache !== null) {
+            return $this->rankCache;
+        }
+
+        $repo = app(\App\Repositories\UserRepository::class);
+        $roles = $repo->acceptedRolesOf($this);
+
+        if (empty($roles)) {
+            return $this->rankCache = [
+                'global' => $repo->rankInRoleBoard($this, null, false),
+                'local'  => $repo->rankInRoleBoard($this, null, true),
+            ];
+        }
+
+        $best = null;
+        foreach ($roles as $role) {
+            $global = $repo->rankInRoleBoard($this, $role, false);
+            if ($best === null || $global < $best['global']) {
+                $best = [
+                    'global' => $global,
+                    'local'  => $repo->rankInRoleBoard($this, $role, true),
+                ];
+            }
+        }
+
+        return $this->rankCache = $best;
     }
 
-    public function localRank(?int $countryCode = null): int
+    public function globalRank(): int
     {
-        $countryCode ??= $this->country_code;
+        return $this->computeRanks()['global'];
+    }
 
-        $myPoints = $this->points?->total_points ?? 0;
-
-        return Point::whereHas('user', function ($q) use ($countryCode) {
-            $q->where('country_code', $countryCode);
-        })
-            ->where('total_points', '>', $myPoints)
-            ->count() + 1;
+    public function localRank(): int
+    {
+        return $this->computeRanks()['local'];
     }
 
     public function plaintiffCases()

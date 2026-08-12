@@ -30,7 +30,12 @@ class GroupResource extends JsonResource
             // them → 0 (the app renders "—" for an unranked/zero group).
             'points' => (int) ($this->points ?? 0),
             'global_rank' => (int) ($this->global_rank ?? 0),
-            'my_role' => $this->pivot?->role ?? null,
+            // The owner is always the judge — force it so a drifted pivot row
+            // can't make the creator read as a citizen (which would wrongly let
+            // them file cases and mislabel them in role screens).
+            'my_role' => ((int) $this->user_id === (int) auth()->id())
+                ? 'judge'
+                : ($this->pivot?->role ?? null),
         ];
     }
 }

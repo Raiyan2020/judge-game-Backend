@@ -82,7 +82,18 @@ class GroupRepository extends BaseRepository
 
     public function getGroupMembers($group)
     {
-        return $group->users->where('pivot.status', 'accepted')->groupBy('pivot.role');
+        $ownerId = (int) $group->user_id;
+
+        return $group->users
+            ->where('pivot.status', 'accepted')
+            // Collapse any duplicate membership rows for one user (possible until
+            // the group_user unique-index migration runs) so nobody renders twice.
+            ->unique('id')
+            // The group owner is ALWAYS the judge, whatever the stored pivot role
+            // says — a drifted owner row must never demote them to another bucket.
+            ->groupBy(
+                fn ($user) => (int) $user->id === $ownerId ? 'judge' : $user->pivot->role
+            );
     }
 
     public function getGroupMemberPivot($group, $user)

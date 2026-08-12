@@ -41,6 +41,9 @@ class RoomResource extends JsonResource
                 return [
                     'id' => $user->id,
                     'name' => $user->name,
+                    // Full avatar URL (with placeholder fallback) so the in-room
+                    // attendee grid can render faces, not just names.
+                    'image' => $user->image,
                     'is_admin' => (bool) $user->pivot->is_admin,
                     'is_muted' => (bool) $user->pivot->is_muted
                 ];

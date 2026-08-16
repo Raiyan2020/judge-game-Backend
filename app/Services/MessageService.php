@@ -194,6 +194,15 @@ class MessageService
 
         $this->createPollOptions($poll, $data['options'] ?? null);
 
+        // Broadcast the poll message so other members see the announcement live,
+        // exactly like a text message (fail-soft — a broadcast error must never
+        // fail the already-persisted poll).
+        try {
+            broadcast(new MessageSent($message))->toOthers();
+        } catch (\Throwable $e) {
+            \Log::warning('Broadcast poll MessageSent failed: ' . $e->getMessage());
+        }
+
         return $poll;
     }
 
@@ -245,9 +254,10 @@ class MessageService
                 return ['option' => $option];
             })->toArray();
         } else {
+            // Arabic defaults — the app is Arabic-first and these render raw.
             $options = [
-                ['option' => 'yes'],
-                ['option' => 'no'],
+                ['option' => 'نعم'],
+                ['option' => 'لا'],
             ];
         }
 
@@ -283,9 +293,20 @@ class MessageService
             ->where('user_id', $userId)
             ->delete();
 
-        return $option->votes()->create([
+        $vote = $option->votes()->create([
             'user_id' => $userId,
         ]);
+
+        // Push the new tallies to the channel so every member's bar moves live
+        // (fail-soft — a broadcast error must never fail the recorded vote).
+        try {
+            $poll->load('chatMessage', 'options');
+            broadcast(new \App\Events\PollVoted($poll))->toOthers();
+        } catch (\Throwable $e) {
+            \Log::warning('Broadcast PollVoted failed: ' . $e->getMessage());
+        }
+
+        return $vote;
     }
 
     /**

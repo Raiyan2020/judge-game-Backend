@@ -23,6 +23,7 @@ class NewCallNotification extends Notification
 
         return [
             'model_id' => $this->data['model_id'] ,
+            'group_id' => $this->data['group_id'] ?? null,
             'title' => [
                 'ar' => $this->data['title']['ar'] ?? null,
                 'en' => $this->data['title']['en'] ?? null,

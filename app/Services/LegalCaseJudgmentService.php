@@ -18,7 +18,8 @@ class LegalCaseJudgmentService
 {
     public function __construct(
         protected LegalCaseJudgmentRepository $judgmentRepo,
-        protected LegalCaseRepository $legalCaseRepo
+        protected LegalCaseRepository $legalCaseRepo,
+        protected PointsService $points
     ) {}
 
     public function storeFirstJudgment(array $data)
@@ -68,6 +69,10 @@ class LegalCaseJudgmentService
             } else {
                 $legalCase->update(['status' => LegalCaseStatus::ONGOING->value]);
             }
+
+            // Award role points for the first-instance ruling (judge; acquittal
+            // also pays the winning defendant side).
+            $this->points->onFirstJudgment($legalCase, $data['judgment_type']);
 
             DB::commit();
 
@@ -124,6 +129,9 @@ class LegalCaseJudgmentService
             $legalCase->update(['status' => LegalCaseStatus::EXECUTION->value, 'winner_id' => $data['judgment_type'] === LegalCaseJudgmentType::CONVICTION->value ? $legalCase->plaintiff?->user_id : $legalCase->defendant?->user_id]);
 
             $this->createFinalJudgmentNews($legalCase, $judgment);
+
+            // Award role points for the appeal (final) ruling.
+            $this->points->onFinalJudgment($legalCase, $data['judgment_type']);
 
             DB::commit();
 
@@ -305,6 +313,10 @@ class LegalCaseJudgmentService
             }
 
             $this->createAcceptanceNews($legalCase, $judgment);
+
+            // The defendant lawyer accepted the conviction → plaintiff side won.
+            $this->points->onJudgmentAccepted($legalCase);
+
             DB::commit();
 
             return $legalCase;

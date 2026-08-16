@@ -125,6 +125,7 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::get('rooms/{room}', [RoomController::class, 'show']);
         Route::post('rooms/{room}/join', [RoomController::class, 'join']);
         Route::post('rooms/{room}/leave', [RoomController::class, 'leave']);
+        Route::post('rooms/{room}/end', [RoomController::class, 'endRoom']);
         Route::post('rooms/{room}/toggle-mute', [RoomController::class, 'toggleMute']);
         // Hearings for a case (schedule / list). Judge or a party only — not
         // subscription-gated (coordination, not a paid judicial action).

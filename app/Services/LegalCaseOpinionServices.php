@@ -14,7 +14,10 @@ use Illuminate\Validation\ValidationException;
 
 class LegalCaseOpinionServices
 {
-    public function __construct(protected LegalCaseRepository $repo) {}
+    public function __construct(
+        protected LegalCaseRepository $repo,
+        protected PointsService $points,
+    ) {}
 
 
     public function createOpinion($request)
@@ -301,6 +304,9 @@ class LegalCaseOpinionServices
                 'user_id' => $user->id,
                 'role' => CaseRole::CONSULTANT->value,
             ]);
+
+            // Consultant is now a party to the case → award participation points.
+            $this->points->onConsultantParticipation($legalCase, $user->id);
 
             return CaseRole::CONSULTANT->value;
         }

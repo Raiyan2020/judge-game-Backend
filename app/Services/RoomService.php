@@ -28,21 +28,15 @@ class RoomService
         try {
             DB::beginTransaction();
             $invitedUsers = $request['users'] ?? [];
-            $users = collect([
-                [
-                    'user_id' => auth()->id(),
-                    'is_admin' => true,
-                ]
-            ])->merge(
-                collect($invitedUsers)->map(fn($userId) => [
-                    'user_id' => $userId,
-                    'is_admin' => false,
-                ])
-            );
             $request['user_id'] = auth()->id();
 
             $room = $this->repo->create($request);
-            $room->users()->attach($users);
+            // Attach ONLY the creator (as admin) — invitees are notified, not
+            // pre-joined. Pre-attaching everyone made the whole group show as
+            // "present" before anyone entered AND let invitees skip the private
+            // room's password (their pivot already existed). They now join
+            // explicitly via `join`.
+            $room->users()->attach(auth()->id(), ['is_admin' => true]);
 
 
             DB::afterCommit(function () use ($invitedUsers, $room, $request) {
@@ -66,14 +60,16 @@ class RoomService
 
         $data = [
             'model_id' => $room->id,
+            // The room's group, so tapping the push deep-links to that group's
+            // live screen (FcmChannel prefers group_id for related_data).
+            'group_id' => $room->group_id,
             'title' => [
-                'ar' => __('New call invitation'),
+                'ar' => 'دعوة إلى غرفة صوتية',
                 'en' => 'New call invitation',
             ],
             'body' => [
-                'ar' => __('You have been invited to join a call in room :room with password :password', ['room' => $room->name, 'password' => $password ?? null]),
-                'en' => 'You have been invited to join a call in room :room with password :password',
-                ['room' => $room->name, 'password' => $password ?? null],
+                'ar' => 'تمت دعوتك للانضمام إلى غرفة ' . $room->name,
+                'en' => 'You have been invited to join room ' . $room->name,
             ],
             'type' => 'call',
         ];
@@ -85,9 +81,11 @@ class RoomService
 
 public function join($room, $validatedData)
 {
+    // The owner never needs the password for their own room.
     if (
         $room->type === 'private' &&
-        !Hash::check($validatedData['password'], $room->password)
+        $room->user_id !== auth()->id() &&
+        !Hash::check($validatedData['password'] ?? '', $room->password)
     ) {
         throw ValidationException::withMessages([
             'password' => [__('The provided password is incorrect.')]
@@ -117,13 +115,27 @@ public function join($room, $validatedData)
 
     return $room;
 }
+    /**
+     * Leave the call. The room STAYS open (even for the owner) so anyone —
+     * including the owner — can come back. Ending the room for good is a
+     * separate, owner-only action ([endRoom]).
+     */
     public function leave($room)
     {
-        if ($room->user_id === auth()->id()) {
-            $room->delete();
-            return;
-        }
         $room->users()->detach(auth()->id());
+    }
+
+    /**
+     * Permanently end (delete) the room — owner only.
+     */
+    public function endRoom($room)
+    {
+        if ($room->user_id !== auth()->id()) {
+            throw ValidationException::withMessages([
+                'user' => [__('Only the room owner can end the room.')],
+            ]);
+        }
+        $room->delete();
     }
 
     public function toggleMute($room)

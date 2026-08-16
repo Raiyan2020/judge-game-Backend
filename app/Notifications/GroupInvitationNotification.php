@@ -36,8 +36,8 @@ class GroupInvitationNotification extends Notification
             'image' => $this->group->image,
             'inviter_name' => $inviter,
             'title' => [
-                'ar' => $groupName,
-                'en' => $groupName,
+                'ar' => 'دعوة للانضمام إلى ' . $groupName,
+                'en' => 'Invitation to join ' . $groupName,
             ],
             'body' => [
                 'ar' => trim($inviter . ' دعاك للانضمام إلى ' . $groupName),

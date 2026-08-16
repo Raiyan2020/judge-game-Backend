@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\CaseRole;
+use App\Enums\LegalCaseStatus;
 use App\Models\LegalCaseJudgment;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -88,6 +89,50 @@ class LegalCase extends Model implements HasMedia
 
         $participant = $this->participants->firstWhere('user_id', auth()->id());
         return $participant ? $participant->role : null;
+    }
+
+    /**
+     * Whether the signed-in user may INITIATE a consultation on this case:
+     * they're a consultant in the case's group, the case has no consultant yet,
+     * it isn't already closed/in execution, and they aren't already a party.
+     *
+     * The app uses this to surface the "give a consultation" entry — otherwise a
+     * group consultant who never joined the case has my_role null and no action
+     * (the tester's "consultant has no action"). Initiating self-assigns them
+     * (see LegalCaseOpinionServices::assignConsultantIfEligible).
+     */
+    public function canConsult(): bool
+    {
+        if (!auth()->check()) {
+            return false;
+        }
+
+        if (in_array($this->status, [
+            LegalCaseStatus::CLOSED->value,
+            LegalCaseStatus::EXECUTION->value,
+        ], true)) {
+            return false;
+        }
+
+        // Already a party (any role) → the normal footer handles them.
+        if ($this->participants->firstWhere('user_id', auth()->id())) {
+            return false;
+        }
+
+        // The case must not already have a consultant.
+        $hasConsultant = $this->participants
+            ->firstWhere('role', CaseRole::CONSULTANT->value);
+        if ($hasConsultant) {
+            return false;
+        }
+
+        // The user must be a consultant in this case's group.
+        return $this->group
+            ? $this->group->users()
+                ->where('user_id', auth()->id())
+                ->wherePivot('role', CaseRole::CONSULTANT->value)
+                ->exists()
+            : false;
     }
 
     public function witnesses()

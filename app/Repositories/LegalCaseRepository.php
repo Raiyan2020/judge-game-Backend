@@ -29,7 +29,7 @@ class LegalCaseRepository extends BaseRepository
         if (!empty($filters['group_id'])) {
             $query->where('group_id', $filters['group_id']);
         }
-        return $query->with(['plaintiff', 'defendant', 'group', 'plaintiffLawyer', 'defendantLawyer', 'finalJudgment'])->latest()->paginate(10);
+        return $query->with(['plaintiff', 'defendant', 'group', 'plaintiffLawyer', 'defendantLawyer', 'finalJudgment', 'media'])->latest()->paginate(10);
     }
 
     public function createCaseNews($legalCase, $type, $content, $actorId , $subjectId )

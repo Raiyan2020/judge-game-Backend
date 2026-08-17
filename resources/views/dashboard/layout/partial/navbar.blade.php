@@ -79,6 +79,13 @@
                             </span>
                         </a>
                         <div class="dropdown-menu dropdown-menu-right">
+                            <a class="dropdown-item" href="{{ route('admin.profile.show') }}">
+                                <i class="feather icon-user"></i> {{ __('my profile') }}
+                            </a>
+                            <a class="dropdown-item" href="{{ route('admin.profile.edit') }}">
+                                <i class="feather icon-edit"></i> {{ __('edit profile') }}
+                            </a>
+                            <div class="dropdown-divider"></div>
                             <a class="dropdown-item" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
                                 <i class="feather icon-power"></i> {{ __('logout') }}
                             </a>

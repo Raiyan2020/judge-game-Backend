@@ -27,7 +27,7 @@
             [
                 'title' => __('pricing details'),
                 'rows' => [
-                    ['label' => __('price'), 'value' => $package->price],
+                    ['label' => __('price'), 'value' => format_package_price($package->price)],
                     ['label' => __('duration in days'), 'value' => $package->duration_days],
                 ],
             ],

@@ -19,12 +19,16 @@ class GroupDataTable extends DataTable
     public function dataTable(QueryBuilder $query): EloquentDataTable
     {
         return (new EloquentDataTable($query))
-
+            ->addColumn('action', 'dashboard.groups.action')
             ->addColumn('name', function ($group) {
                 return $group->name;
             })
             ->addColumn('image', function ($group) {
-                return " <img src='{$group->image}'  width='75' height='75'>";
+                if ($group->getRawOriginal('image')) {
+                    return '<img src="' . e($group->image) . '" width="75" height="75" alt="' . e($group->name) . '">';
+                }
+
+                return '<span class="text-muted">' . e(__('no image')) . '</span>';
             })
             ->addColumn('owner', function ($group) {
                 return $group->owner ? $group->owner->name : '';
@@ -39,7 +43,7 @@ class GroupDataTable extends DataTable
             })
 
             ->addIndexColumn()
-            ->rawColumns(['name', 'image', 'owner'])
+            ->rawColumns(['name', 'image', 'owner', 'action'])
             ->setRowId('id');
     }
 
@@ -110,7 +114,7 @@ class GroupDataTable extends DataTable
             Column::computed('owner')->title(__('owner'))->searchable(),
             Column::computed('accepted_users_count')->title(__('members count')),
             Column::computed('legal_cases_count')->title(__('legal cases count')),
-
+            Column::computed('action')->title(__('actions')),
         ];
     }
 

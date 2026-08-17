@@ -29,7 +29,13 @@ class PackageDataTable extends DataTable
             ->addColumn('name', function ($package) {
                 return $package->name;
             })
-           
+            ->editColumn('price', fn (Package $package) => format_package_price($package->price))
+            ->filterColumn('price', function ($query, $keyword) {
+                $query->where('packages.price', 'like', "%{$keyword}%");
+            })
+            ->filterColumn('duration_days', function ($query, $keyword) {
+                $query->where('packages.duration_days', 'like', "%{$keyword}%");
+            })
             ->addColumn('status', function ($package) {
                 return view('dashboard.packages.status', ['package' => $package]);
             })
@@ -94,8 +100,8 @@ class PackageDataTable extends DataTable
         return [
             Column::computed('DT_RowIndex')->title('#'),
             Column::computed('name')->title(__('name'))->searchable(),
-            Column::make('price')->title(__('price')),
-            Column::make('duration_days')->title(__('duration in days')),
+            Column::make('price')->title(__('price'))->searchable(),
+            Column::make('duration_days')->title(__('duration in days'))->searchable(),
             Column::computed('status')->title(__('status')),
             Column::computed('action')->title(__('actions')),
         ];

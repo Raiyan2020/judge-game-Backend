@@ -10,7 +10,9 @@
                 'rows' => [
                     ['label' => __('name'), 'value' => $contact->name],
                     ['label' => __('email'), 'value' => $contact->email],
-                    ['label' => __('phone'), 'value' => $contact->phone],
+                    ['label' => __('phone code'), 'value' => $contact->country_code ? '+' . ltrim($contact->country_code, '+') : '-'],
+                    ['label' => __('phone'), 'value' => $contact->phone ?? '-'],
+                    ['label' => __('full phone'), 'value' => format_phone_with_code($contact->country_code, $contact->phone)],
                 ],
             ],
             [

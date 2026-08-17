@@ -17,8 +17,14 @@
         </x-admin-form-section>
 
         <x-admin-form-section :title="__('pricing details')" icon="icon-dollar-sign" col="col-lg-6">
-            <x-number title="{{ __('price') }}" name="price" size="12"
-                value="{{ old('price', $package->price ?? '') }}"></x-number>
+            <x-number
+                title="{{ __('price') }}"
+                name="price"
+                size="12"
+                step="1"
+                min="1"
+                value="{{ old('price', isset($package) ? format_package_price($package->price) : '') }}"
+            ></x-number>
             <x-number title="{{ __('duration in days') }}" name="duration_days" size="12"
                 value="{{ old('duration_days', $package->duration_days ?? '') }}"></x-number>
         </x-admin-form-section>

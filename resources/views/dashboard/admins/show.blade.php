@@ -4,6 +4,8 @@
     @include('dashboard.partials.show-page', [
         'title' => __('view') . ' - ' . $admin->name,
         'backUrl' => route('admin.admins.index'),
+        'editUrl' => route('admin.admins.edit', $admin),
+        'editPosition' => 'bottom',
         'sections' => [
             [
                 'title' => __('basic information'),

@@ -56,6 +56,7 @@ class RoleTitleController extends Controller
     public function edit(RoleTitle $roleTitle)
     {
         $roles = $this->roleTitleService->getRoles();
+        $roleTitle->load('requirements.action');
 
         return view('dashboard.role-titles.edit', ['roleTitle' => $roleTitle , 'roles'=>$roles]);
     }

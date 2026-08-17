@@ -20,7 +20,7 @@ class MyfatoorahService
             $payload = [
                 'CustomerName' => $packageSubscription->user?->name ?? 'Customer',
                 'CustomerMobile' => $packageSubscription->user?->phone ?? '00000000',
-                'DisplayCurrencyIso' => 'KWD',
+                'DisplayCurrencyIso' => config('payment.currency', 'KWD'),
                 'InvoiceValue' =>  $packageSubscription->total,
                 'CallBackUrl' => route('payment.success'),
                 'ErrorUrl' => route('payment.error'),

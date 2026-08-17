@@ -10,7 +10,7 @@
                 'rows' => [
                     ['label' => __('title') . ' (' . __('in Arabic') . ')', 'value' => $banner->getTranslation('title', 'ar')],
                     ['label' => __('title') . ' (' . __('in English') . ')', 'value' => $banner->getTranslation('title', 'en')],
-                    ['label' => __('url'), 'value' => $banner->url ?: '-', 'full' => true],
+                    ['label' => __('link url'), 'value' => $banner->url ?: '-', 'full' => true],
                     [
                         'label' => __('status'),
                         'value' => $banner->is_active

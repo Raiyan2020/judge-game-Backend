@@ -2,21 +2,16 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Enums\CaseRole;
-use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\RoleAtion\StoreRequest;
 use App\Services\RoleActionService;
 
-use function Symfony\Component\String\b;
-
 class RoleActionController extends Controller
 {
+    public function __construct(protected RoleActionService $roleActionService)
+    {
+    }
 
-    public function __construct(protected RoleActionService $roleActionService) {}
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
         $roles = $this->roleActionService->getRoles();
@@ -24,59 +19,50 @@ class RoleActionController extends Controller
         return view('dashboard.role-actions.index', compact('roles'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function show(string $role)
     {
-        //
+        $actions = $this->roleActionService->getActionsByRole($role);
+
+        return view('dashboard.role-actions.show', [
+            'role' => $role,
+            'actions' => $actions,
+        ]);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(StoreRequest $request)
     {
         $this->roleActionService->updatePoints($request->validated());
-        added();
-        return redirect()->route('admin.role-actions.index');
+        updated();
+
+        $role = $request->input('role');
+
+        return redirect()->route(
+            $role ? 'admin.role-actions.show' : 'admin.role-actions.index',
+            $role ? ['role' => $role] : []
+        );
     }
 
-
-
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit($role)
+    public function edit(string $role)
     {
         $actions = $this->roleActionService->getActionsByRole($role);
-        return view('dashboard.role-actions.form', ['actions' => $actions]);
+
+        return view('dashboard.role-actions.form', [
+            'role' => $role,
+            'actions' => $actions,
+        ]);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    public function getActions(string $role)
     {
-        //
-    }
+        $actions = app(\App\Repositories\RoleAchievementRepository::class)->getRoleActions($role);
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
-    }
-
-    public function getActions($role)
-    {
-        if ($role == 'lawyer') {
-            $role = CaseRole::DEFENDANT_LAWYER->value;
-        }
-        $actions = $this->roleActionService->getActionsByRole($role);
-
-        return response()->json($actions);
+        return $actions->map(fn ($action) => [
+            'id' => $action->id,
+            'key' => $action->key,
+            'title' => [
+                'ar' => $action->getTranslation('title', 'ar'),
+                'en' => $action->getTranslation('title', 'en'),
+            ],
+        ])->values();
     }
 }

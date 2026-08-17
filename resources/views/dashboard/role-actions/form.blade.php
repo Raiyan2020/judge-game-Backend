@@ -1,64 +1,66 @@
 @extends('dashboard.layout.main')
-@section('title', __('points'))
+@section('title', __('edit') . ' - ' . __('points') . ' - ' . __($role))
+@section('breadcrumbParent', __('points'))
+@section('breadcrumbParentUrl', route('admin.role-actions.index'))
 @section('content')
+    @php
+        $inputIndex = 0;
+        $earnedActions = $role === 'citizen'
+            ? $actions->reject(fn ($action) => $action->isCitizenAgainstAction())->values()
+            : $actions;
+        $againstActions = $role === 'citizen'
+            ? $actions->filter(fn ($action) => $action->isCitizenAgainstAction())->values()
+            : collect();
+    @endphp
+
     <div class="content-body">
-        <section id="basic-input">
-            <div class="row">
-                <div class="col-md-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h4 class="card-title"> {{ __('points') }}</h4>
-                        </div>
-                        <div class="card-content">
-                            <div class="card-body">
-                                <form action="{{ route('admin.role-actions.store') }}" method="POST">
-                                    @csrf
+        <section id="basic-input" class="admin-form-page">
+            <div class="admin-show-page__hero mb-2">
+                <div class="admin-show-page__hero-main">
+                    <a href="{{ route('admin.role-actions.show', $role) }}" class="admin-show-page__back">
+                        <i class="feather icon-arrow-right"></i>
+                        <span>{{ __('back') }}</span>
+                    </a>
+                    <h2 class="admin-show-page__title">{{ __('edit') }} - {{ __('points') }} - {{ __($role) }}</h2>
+                </div>
+            </div>
 
-                                    <div class="table-responsive">
-                                        <table class="table table-bordered table-striped">
-                                            <thead>
-                                                <tr>
-                                                    <th width="60%">{{ __('action') }}</th>
-                                                    <th width="25%">{{ __('points') }}</th>
-                                                </tr>
-                                            </thead>
+            <div class="card">
+                <div class="card-content">
+                    <div class="card-body">
+                        <form action="{{ route('admin.role-actions.store') }}" method="POST">
+                            @csrf
+                            <input type="hidden" name="role" value="{{ $role }}">
 
-                                            <tbody>
-                                                @forelse($actions as $index => $action)
-                                                    <tr>
-                                                        <td>
-                                                            {{ $action->title }}
+                            @if ($earnedActions->isNotEmpty())
+                                @include('dashboard.role-actions.partials.actions-table', [
+                                    'actions' => $earnedActions,
+                                    'startIndex' => $inputIndex,
+                                    'sectionTitle' => $role === 'citizen' ? __('citizen earned points') : null,
+                                ])
+                                @php $inputIndex += $earnedActions->count(); @endphp
+                            @endif
 
-                                                            <input type="hidden" name="actions[{{ $index }}][id]"
-                                                                value="{{ $action->id }}">
-                                                        </td>
+                            @if ($againstActions->isNotEmpty())
+                                @include('dashboard.role-actions.partials.actions-table', [
+                                    'actions' => $againstActions,
+                                    'startIndex' => $inputIndex,
+                                    'sectionTitle' => __('citizen against points'),
+                                    'sectionHint' => __('citizen against points hint'),
+                                    'hideHeader' => $earnedActions->isNotEmpty(),
+                                ])
+                            @endif
 
-                                                        <td>
-                                                            <input type="number" class="form-control"
-                                                                name="actions[{{ $index }}][points]"
-                                                                value="{{ old("actions.$index.points", $action->points) }}"
-                                                                min="0">
-                                                        </td>
+                            @if ($actions->isEmpty())
+                                <p class="text-center mb-0">{{ __('No data found') }}</p>
+                            @endif
 
-                                                       
-                                                    </tr>
-                                                @empty
-                                                    <tr>
-                                                        <td colspan="3" class="text-center">
-                                                            {{ __('No data found') }}
-                                                        </td>
-                                                    </tr>
-                                                @endforelse
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    <button type="submit" class="btn btn-success mr-1 mb-1 waves-effect waves-light">
-                                        {{ __('save') }}
-                                    </button>
-                                </form>
+                            <div class="admin-form-page__actions">
+                                <button type="submit" class="btn btn-success waves-effect waves-light">
+                                    {{ __('save') }}
+                                </button>
                             </div>
-                        </div>
+                        </form>
                     </div>
                 </div>
             </div>

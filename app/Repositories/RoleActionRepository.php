@@ -24,9 +24,11 @@ class RoleActionRepository extends BaseRepository
         return $this->model->where('role',$role)->get();
     }
 
-    public function updatePoint($id , $points)
+    public function updatePoint($id, $points)
     {
-        $this->model->where('id',$id)->update(['points'=>$points]);
+        $points = max(0, min((int) $points, RoleAction::MAX_POINTS));
+
+        $this->model->where('id', $id)->update(['points' => $points]);
     }
 
  

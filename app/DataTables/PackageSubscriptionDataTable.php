@@ -33,6 +33,14 @@ class PackageSubscriptionDataTable extends DataTable
             ->addColumn('ends_at', function ($packageSubscription) {
                 return $packageSubscription->ends_at ? $packageSubscription->ends_at->format('Y-m-d') : '' ;
             })
+            ->editColumn('total', fn (PackageSubscription $subscription) => format_money($subscription->total))
+            ->editColumn('discount', fn (PackageSubscription $subscription) => format_money($subscription->discount))
+            ->filterColumn('total', function ($query, $keyword) {
+                $query->where('package_subscriptions.total', 'like', "%{$keyword}%");
+            })
+            ->filterColumn('discount', function ($query, $keyword) {
+                $query->where('package_subscriptions.discount', 'like', "%{$keyword}%");
+            })
             ->filterColumn('package_name', function ($query, $keyword) {
                 $query->whereHas('package', function ($packageQuery) use ($keyword) {
                     $packageQuery->where(function ($q) use ($keyword) {
@@ -55,7 +63,7 @@ class PackageSubscriptionDataTable extends DataTable
            
           
             ->addIndexColumn()
-            ->rawColumns(['package_name', 'user_name', 'starts_at', 'ends_at',])
+            ->rawColumns(['package_name', 'user_name', 'starts_at', 'ends_at', 'total', 'discount'])
             ->setRowId('id');
     }
 
@@ -116,8 +124,8 @@ class PackageSubscriptionDataTable extends DataTable
             Column::computed('DT_RowIndex')->title('#'),
             Column::computed('package_name')->title(__('packagename'))->searchable(),
             Column::computed('user_name')->title(__('username'))->searchable(),
-            Column::make('total')->title(__('price')),
-            Column::make('discount')->title(__('discount')),
+            Column::make('total')->title(__('total'))->searchable(),
+            Column::make('discount')->title(__('discount'))->searchable(),
             Column::computed('starts_at')->title(__('starts at')),
             Column::computed('ends_at')->title(__('ends at')),
         ];

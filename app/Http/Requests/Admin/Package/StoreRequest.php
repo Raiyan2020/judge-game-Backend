@@ -31,7 +31,7 @@ class StoreRequest extends FormRequest
             'description' => 'required|array' ,
             'description.ar'=>'required|string|min:1|max:1000',
             'description.en'=>'required|string|min:1|max:1000',
-            'price' => 'required|numeric|min:1|max:9999999',
+            'price' => 'required|integer|min:1|max:9999999',
             'duration_days' => 'required|integer|min:1|max:3650',
             'most_sale'=>'nullable|boolean'
         ];

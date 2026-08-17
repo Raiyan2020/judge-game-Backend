@@ -2,14 +2,23 @@
     <div class="row match-height">
         <x-admin-form-section :title="__('basic information')" icon="icon-map-pin" col="col-lg-6">
             <x-translatable title="{{ __('name') }}" name="name" size="12" :item="isset($country) ? $country : null"></x-translatable>
-            <x-text title="{{ __('phone code') }}" name="country_code" size="12" value="{{ old('country_code', $country->country_code ?? '') }}"></x-text>
+            <x-text
+                title="{{ __('phone code') }}"
+                name="country_code"
+                type="tel"
+                inputmode="numeric"
+                pattern="\+?[0-9]{1,4}"
+                :hint="__('country code hint')"
+                size="12"
+                value="{{ old('country_code', $country->country_code ?? '') }}"
+            ></x-text>
         </x-admin-form-section>
 
         <x-admin-form-section :title="__('media and images')" icon="icon-image" col="col-lg-6">
             <div class="col-12">
                 <div class="form-group">
                     <label>{{ __('image') }}</label>
-                    <input type="file" name="image" class="dropify" data-height="200" accept="image/*"
+                    <input type="file" name="image" class="dropify" data-height="200" accept="image/jpeg,image/png,image/gif,image/webp"
                         {{ @$country->image ? 'data-default-file=' . $country->image . '' : '' }}>
                     @error('image')
                         <span style="color: red">{{ $message }}</span>

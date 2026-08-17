@@ -24,8 +24,18 @@ class ContactRequest extends FormRequest
         return [
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255',
+            'country_code' => 'nullable|string|max:5',
             'phone' => 'nullable|string|max:20',
             'message' => 'required|string',
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('country_code') && $this->country_code !== null) {
+            $this->merge([
+                'country_code' => ltrim((string) $this->country_code, '+'),
+            ]);
+        }
     }
 }

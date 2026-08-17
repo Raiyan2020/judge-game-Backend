@@ -10,6 +10,13 @@
                 @endif
                 <h2 class="admin-show-page__title">{{ $title ?? __('view') }}</h2>
             </div>
+            @if (!empty($editUrl) && ($editPosition ?? 'hero') === 'hero')
+                <div class="admin-show-page__hero-actions">
+                    <a href="{{ $editUrl }}" class="btn btn-primary btn-sm waves-effect waves-light">
+                        <i class="feather icon-edit"></i> {{ __('edit') }}
+                    </a>
+                </div>
+            @endif
         </div>
 
         <div class="row match-height admin-show-page__grid">
@@ -21,5 +28,13 @@
                 @endif
             @endforeach
         </div>
+
+        @if (!empty($editUrl) && ($editPosition ?? 'hero') === 'bottom')
+            <div class="admin-show-page__actions">
+                <a href="{{ $editUrl }}" class="btn btn-primary waves-effect waves-light">
+                    <i class="feather icon-edit"></i> {{ __('edit') }}
+                </a>
+            </div>
+        @endif
     </section>
 </div>

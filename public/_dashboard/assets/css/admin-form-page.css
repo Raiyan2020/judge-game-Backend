@@ -440,3 +440,15 @@ body:not(.dark-layout) .admin-form-btn--ghost {
         animation: adminFormHeaderIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both !important;
     }
 }
+
+/* Centered form submit row (add / edit pages) */
+.admin-form-page__actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+    padding: 1rem 0;
+}

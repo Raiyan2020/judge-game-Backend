@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\LastUpdateController;
 use App\Http\Controllers\Admin\LoginController;
 use App\Http\Controllers\Admin\PackageController;
 use App\Http\Controllers\Admin\PackageSubscriptionController;
+use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\RoleActionController;
 use App\Http\Controllers\Admin\RoleTitleController;
 use App\Http\Controllers\Admin\SettingController;
@@ -24,9 +25,13 @@ Route::group(['middleware' => ['guest:admin', 'localization']], function () {
     Route::post('login', [LoginController::class, 'store']);
 });
 
-Route::group(['middleware' => ['auth:admin', 'localization']], function () {
+Route::group(['middleware' => ['auth:admin', 'adminActive', 'localization']], function () {
     Route::post('logout', [LoginController::class, 'destroy'])->name('logout');
     Route::get('/', [HomeController::class, 'index'])->name('home');
+    Route::get('profile', [ProfileController::class, 'show'])->name('profile.show');
+    Route::get('profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
     Route::resources([
         'admins' => AdminController::class,
         'countries' => CountryController::class,
@@ -40,7 +45,8 @@ Route::group(['middleware' => ['auth:admin', 'localization']], function () {
         'role-titles'=>RoleTitleController::class
     ]);
     Route::get('subscriptions', [PackageSubscriptionController::class,'index'])->name('subscriptions.index');
-    Route::get('groups', [GroupController::class,'index'])->name('groups.index');
+    Route::get('groups', [GroupController::class, 'index'])->name('groups.index');
+    Route::get('groups/{group}', [GroupController::class, 'show'])->name('groups.show');
     Route::get('contacts', [ContactController::class,'index'])->name('contacts.index');
     Route::get('contacts/{contact}', [ContactController::class,'show'])->name('contacts.show');
     Route::delete('contacts/{contact}', [ContactController::class,'destroy'])->name('contacts.destroy');
@@ -50,10 +56,11 @@ Route::group(['middleware' => ['auth:admin', 'localization']], function () {
     Route::PUT('last-updates/change-status/{lastUpdate}', [LastUpdateController::class, 'changeStatus'])->name('last-updates.changeStatus');
     Route::PUT('coupons/change-status/{coupon}', [CouponController::class, 'changeStatus'])->name('coupons.changeStatus');
     Route::PUT('packages/change-status/{package}', [PackageController::class, 'changeStatus'])->name('packages.changeStatus');
-    Route::get('role-actions', [RoleActionController::class,'index'])->name('role-actions.index');
-    Route::get('role-actions/{role}', [RoleActionController::class,'edit'])->name('role-actions.edit');
-    Route::post('role-actions', [RoleActionController::class,'store'])->name('role-actions.store');
+    Route::get('role-actions', [RoleActionController::class, 'index'])->name('role-actions.index');
+    Route::get('role-actions/{role}/edit', [RoleActionController::class, 'edit'])->name('role-actions.edit');
+    Route::get('role-actions/{role}', [RoleActionController::class, 'show'])->name('role-actions.show');
+    Route::post('role-actions', [RoleActionController::class, 'store'])->name('role-actions.store');
     Route::get('roles-actions/{role}', [RoleActionController::class, 'getActions'])
-    ->name('roles-actions.get');
+        ->name('roles-actions.get');
 
 });

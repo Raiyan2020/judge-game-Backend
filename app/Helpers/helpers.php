@@ -133,3 +133,67 @@ function getStatusName($status)
     return $status == 1 ? __('active') : __('inactive');
 }
 
+/**
+ * Format a percentage value for display (e.g. 40%).
+ */
+function format_discount_percent($value, bool $withSymbol = true): string
+{
+    if ($value === null || $value === '') {
+        return $withSymbol ? '-' : '';
+    }
+
+    $formatted = (string) (int) round((float) $value);
+
+    return $withSymbol ? $formatted . '%' : $formatted;
+}
+
+/**
+ * Format a package price without decimal places.
+ */
+function format_package_price($value): string
+{
+    if ($value === null || $value === '') {
+        return '';
+    }
+
+    return (string) (int) round((float) $value);
+}
+
+/**
+ * Application currency code (e.g. KWD).
+ */
+function app_currency(): string
+{
+    return (string) config('payment.currency', 'KWD');
+}
+
+/**
+ * Format a monetary amount with currency and no decimal places.
+ */
+function format_money($value): string
+{
+    if ($value === null || $value === '') {
+        return '-';
+    }
+
+    return format_package_price($value) . ' ' . __(app_currency());
+}
+
+/**
+ * Format a phone number with its country code for display.
+ */
+function format_phone_with_code(?string $countryCode, ?string $phone): string
+{
+    if ($phone === null || $phone === '') {
+        return '-';
+    }
+
+    $code = $countryCode !== null ? ltrim($countryCode, '+') : '';
+
+    if ($code === '') {
+        return $phone;
+    }
+
+    return '+' . $code . ' ' . $phone;
+}
+

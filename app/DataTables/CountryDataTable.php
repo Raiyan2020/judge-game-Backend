@@ -29,6 +29,9 @@ class CountryDataTable extends DataTable
                       ->orWhereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(name, '$.ar'))) like LOWER(?)", ["%$keyword%"]);
                 });
             })
+            ->filterColumn('country_code', function ($query, $keyword) {
+                $query->where('countries.country_code', 'like', "%{$keyword}%");
+            })
             ->addColumn('name', function ($country) {
                 return $country->name;
              })
@@ -102,7 +105,7 @@ class CountryDataTable extends DataTable
         return [
             Column::computed('DT_RowIndex')->title('#'),
             Column::computed('name')->title(__('name'))->searchable(),
-            Column::make('country_code')->title(__('phone code')),
+            Column::make('country_code')->title(__('phone code'))->searchable(),
             Column::computed('image')->title(__('image')),
             Column::computed('status')->title(__('status')),
             Column::computed('action')->title(__('actions')),

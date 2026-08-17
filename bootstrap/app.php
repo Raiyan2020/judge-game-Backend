@@ -28,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'setLocale' => \App\Http\Middleware\SetLocale::class,
             'localization' => \App\Http\Middleware\Localization::class,
             'auth' => \App\Http\Middleware\Authenticate::class,
+            'adminActive' => \App\Http\Middleware\EnsureAdminIsActive::class,
             'checkActiveSubscription' => \App\Http\Middleware\CheckActiveSubscription::class,
             'groupMember' => \App\Http\Middleware\EnsureGroupMember::class,
 

@@ -14,7 +14,7 @@
         </x-admin-form-section>
     </div>
 
-    <div class="mt-1 mb-1">
+    <div class="admin-form-page__actions">
         <button type="submit" class="btn btn-success waves-effect waves-light">{{ __('save') }}</button>
     </div>
 </div>

@@ -10,6 +10,15 @@ use Illuminate\Database\Eloquent\Builder;
 
 class Coupon extends Model
 {
+    protected function casts(): array
+    {
+        return [
+            'start_at' => 'date',
+            'end_at' => 'date',
+            'is_active' => 'boolean',
+        ];
+    }
+
     #scopes
     public function scopeValidCoupon(Builder $builder)
     {

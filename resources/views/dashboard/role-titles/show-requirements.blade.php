@@ -4,13 +4,13 @@
             <div class="admin-show-item">
                 <div class="admin-show-item__main">
                     <div class="admin-show-item__info">
-                        <div class="admin-show-item__name">{{ $requirement->action->title ?? '-' }}</div>
+                        <div class="admin-show-item__name">{{ $requirement->action?->localizedTitle() ?? '-' }}</div>
                     </div>
                 </div>
                 <div class="admin-show-item__meta">
                     <div class="admin-show-item__stat">
                         <span class="admin-show-item__stat-label">{{ __('Required Count') }}</span>
-                        <span class="admin-show-item__stat-value">{{ $requirement->required_count }}</span>
+                        <span class="admin-show-item__stat-value">{{ (int) $requirement->required_count }}</span>
                     </div>
                 </div>
             </div>

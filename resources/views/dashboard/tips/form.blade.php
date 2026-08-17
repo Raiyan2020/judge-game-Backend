@@ -9,7 +9,7 @@
             <div class="col-12">
                 <div class="form-group">
                     <label>{{ __('image') }}</label>
-                    <input type="file" name="image" class="dropify" data-height="200" accept="image/*"
+                    <input type="file" name="image" class="dropify" data-height="200" accept="image/jpeg,image/png,image/gif,image/webp"
                         {{ @$tip->image ? 'data-default-file=' . $tip->image . '' : '' }}>
                     @error('image')
                         <span style="color: red">{{ $message }}</span>

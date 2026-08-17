@@ -12,7 +12,7 @@
                     ['label' => __('title') . ' (' . __('in English') . ')', 'value' => $roleTitle->getTranslation('title', 'en')],
                     ['label' => __('role'), 'value' => __($roleTitle->role)],
                     ['label' => __('tier'), 'value' => $roleTitle->tier ?? '-'],
-                    ['label' => __('points'), 'value' => $roleTitle->reward_points ?? '-'],
+                    ['label' => __('points'), 'value' => (int) ($roleTitle->reward_points ?? 0)],
                 ],
             ],
             [

@@ -46,4 +46,47 @@ class GroupPermissionService
             ->where('permission_id', $permissionId)
             ->exists();
     }
+
+    /**
+     * The set of user ids in [$group] holding [$permissionKey], resolved in ONE
+     * pass — owner (always) + roles granted the permission + per-user overrides
+     * — so callers can flag a whole members list without an N+1 of
+     * [hasPermission] per row. Returns int ids.
+     *
+     * @return int[]
+     */
+    public function usersWithPermission(Group $group, string $permissionKey): array
+    {
+        // The owner holds every permission (mirrors hasPermission()).
+        $ids = [(int) $group->user_id];
+
+        $permissionId = Permission::query()
+            ->where('key', $permissionKey)
+            ->value('id');
+
+        if (! $permissionId) {
+            return array_values(array_unique($ids));
+        }
+
+        // Every accepted member whose ROLE carries the permission.
+        $roles = $group->permissions()
+            ->where('permission_id', $permissionId)
+            ->pluck('role')
+            ->all();
+
+        if (! empty($roles)) {
+            $ids = array_merge($ids, $group->users()
+                ->wherePivotIn('role', $roles)
+                ->pluck('users.id')
+                ->all());
+        }
+
+        // Per-user overrides.
+        $ids = array_merge($ids, $group->userPermissions()
+            ->where('permission_id', $permissionId)
+            ->pluck('user_id')
+            ->all());
+
+        return array_values(array_unique(array_map('intval', $ids)));
+    }
 }

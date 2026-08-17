@@ -120,6 +120,37 @@ class MessageService
         return Chat::where('group_id', $group->id)->first();
     }
 
+    /**
+     * Posts a SYSTEM message into a group's chat timeline — a message NOT tied
+     * to a live user (`user_id` null, `type` system). Used by
+     * [GroupEventService] to mirror an event into the chat. Broadcasts so it
+     * appears live. No-op when the group has no chat yet. Text is the Arabic
+     * body (the app is Arabic-first, same call as the poll defaults).
+     */
+    public function postSystemMessage(Group $group, string $text): void
+    {
+        $chat = $this->getGroupChat($group);
+        if (! $chat) {
+            return;
+        }
+
+        $message = ChatMessage::create([
+            'user_id' => null,
+            'chat_id' => $chat->id,
+            'message' => $text,
+            'type' => 'system',
+        ]);
+
+        try {
+            // NOT ->toOthers(): a system message is held by no client (nobody
+            // POSTed it), so the actor's own chat would otherwise miss the
+            // notice everyone else sees until they reload.
+            broadcast(new MessageSent($message));
+        } catch (\Throwable $e) {
+            \Log::warning('Broadcast system MessageSent failed: ' . $e->getMessage());
+        }
+    }
+
     public function getOrCreatePrivateChat(int $userId): Chat
     {
         $authId = auth('sanctum')->id();
@@ -349,25 +380,59 @@ class MessageService
             return;
         }
 
+        $groupId = $poll->chatMessage?->chat?->group_id;
+
         switch ($poll->type) {
             case ChatPollType::DELETE_LAW->value:
-                GroupLaw::find($poll->group_law_id)?->delete();
+                $law = GroupLaw::find($poll->group_law_id);
+                $description = $law?->description;
+                $law?->delete();
+                $this->announcePollLaw($groupId, 'تم حذف قانون بالتصويت', 'Law removed by vote', $description);
                 break;
 
             case ChatPollType::UPDATE_LAW->value:
+                $description = $poll->data['description'] ?? null;
                 GroupLaw::find($poll->group_law_id)?->update([
-                    'description' => $poll->data['description'] ?? null,
+                    'description' => $description,
                     'reason' => $poll->data['reason'] ?? null,
                 ]);
+                $this->announcePollLaw($groupId, 'تم تعديل قانون بالتصويت', 'Law amended by vote', $description);
                 break;
 
             case ChatPollType::CREATE_LAW->value:
+                $description = $poll->data['description'] ?? null;
                 GroupLaw::create([
-                    'group_id' => $poll->chatMessage?->chat?->group_id,
-                    'description' => $poll->data['description'] ?? null,
+                    'group_id' => $groupId,
+                    'description' => $description,
                     'reason' => $poll->data['reason'] ?? null,
                 ]);
+                $this->announcePollLaw($groupId, 'تم سنّ قانون جديد بالتصويت', 'New law enacted by vote', $description);
                 break;
         }
+    }
+
+    /**
+     * Announces a poll-ENACTED law change on all three channels. The vote is a
+     * collective decision (no single actor), so everyone in the group is
+     * notified. Resolved lazily (`app(...)`) to avoid the MessageService ↔
+     * GroupEventService constructor cycle.
+     */
+    private function announcePollLaw($groupId, string $ar, string $en, ?string $description): void
+    {
+        if (! $groupId) {
+            return;
+        }
+        $group = Group::find($groupId);
+        if (! $group) {
+            return;
+        }
+        $suffix = $description ? (': ' . $description) : '';
+        app(\App\Services\GroupEventService::class)->notifyGroupEvent(
+            $group,
+            'law_changed',
+            title: ['ar' => 'تغيير في القوانين', 'en' => 'Law changed'],
+            body: ['ar' => $ar . $suffix, 'en' => $en . $suffix],
+            actor: null,
+        );
     }
 }

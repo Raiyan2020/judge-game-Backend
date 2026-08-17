@@ -17,6 +17,7 @@ class LegalCaseOpinionServices
     public function __construct(
         protected LegalCaseRepository $repo,
         protected PointsService $points,
+        protected GroupEventService $events,
     ) {}
 
 
@@ -241,6 +242,14 @@ class LegalCaseOpinionServices
             auth()->id(),
             $legalCase->judge?->user_id
         );
+
+        // Mirror into the group chat (bell already sent to the judge).
+        if ($legalCase->group) {
+            $this->events->postChat(
+                $legalCase->group,
+                'تم طلب استئناف في قضية: ' . $legalCase->title,
+            );
+        }
     }
 
     private function notifyJudgeOnAppealRequest($legalCase): void

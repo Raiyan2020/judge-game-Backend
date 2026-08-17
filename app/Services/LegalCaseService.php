@@ -15,7 +15,7 @@ use Illuminate\Validation\ValidationException;
 
 class LegalCaseService
 {
-    public function __construct(protected LegalCaseRepository $repo, protected GroupRepository $groupRepo, protected GroupPermissionService $groupPermissionService) {}
+    public function __construct(protected LegalCaseRepository $repo, protected GroupRepository $groupRepo, protected GroupPermissionService $groupPermissionService, protected GroupEventService $events) {}
 
     public function index($filters, $groupId)
     {
@@ -98,6 +98,13 @@ class LegalCaseService
         // notification never fails the scheduling itself).
         try {
             $this->notifyPartiesOnHearing($legalCase, $hearing);
+            // Mirror into the group chat so the whole group sees the session.
+            if ($legalCase->group) {
+                $this->events->postChat(
+                    $legalCase->group,
+                    'تم تحديد جلسة في قضية: ' . $legalCase->title,
+                );
+            }
         } catch (\Throwable $e) {
             logger()->warning('Hearing notification failed: ' . $e->getMessage());
         }
@@ -190,6 +197,11 @@ class LegalCaseService
                 try {
                     $this->sendNotificationToPlaintiffLawyer($legalCase);
                     $this->sendCaseFiledNotifications($legalCase, $group, $participants);
+                    // Mirror into the group chat (bell + news already sent above).
+                    $this->events->postChat(
+                        $group,
+                        'تم رفع قضية جديدة: ' . $legalCase->title,
+                    );
                 } catch (\Throwable $e) {
                     logger()->warning('Case-filed notification failed: ' . $e->getMessage());
                 }
@@ -242,14 +254,10 @@ class LegalCaseService
             ]);
         }
 
-        // Only citizens file cases. A judge, lawyer or consultant is a court
-        // officer, never a plaintiff — this replaces the judge-only block, which
-        // let lawyers and consultants through. The app gates this too.
-        if ($creator->pivot->role !== GroupRole::CITIZEN->value) {
-            throw ValidationException::withMessages([
-                __('Only citizens can create legal cases')
-            ]);
-        }
+        // Any role may file now (client request): a judge, lawyer, consultant or
+        // citizen can be a plaintiff. The old citizen-only creator gate was
+        // removed here and in the app. Immunity still protects the DEFENDANT
+        // side (see create()), and the head-count minimum below still applies.
 
         // The minimum head-count counts ACCEPTED members only — the actual row-62
         // fix: a still-pending invitee is not yet a warm body for a fair case.

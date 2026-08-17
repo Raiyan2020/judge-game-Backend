@@ -50,9 +50,9 @@ class LegalCaseNews extends Model
 
             case 'case_final_judgment':
                 return $this->content . " " . __('by') . " " . $this->actor?->name;
-            case 'case_appeal_requested':
+            case 'case_appeal_request':
                 return $this->content . " " . __('by') . " " . $this->actor?->name;
-                
+
             case 'case_appeal_accepted':
                 return $this->content . " " . __('by') . " " . $this->actor?->name;
             case 'case_acceptance_ruling':

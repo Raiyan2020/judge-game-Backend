@@ -22,6 +22,26 @@ class LegalCaseNewsRepository extends BaseRepository
         if (!empty($filters['date'])) {
             $query = $this->applyDateFilter($query, $filters['date']);
         }
+
+        // Scope to the caller's own groups. News now includes GROUP-level events
+        // (role/permission/law changes) — leaking a group's internal events to
+        // non-members would expose group names, member names and case details.
+        // (Case news is scoped the same way; a user has no business seeing cases
+        // from groups they aren't in.)
+        $userId = auth('sanctum')->id();
+        if ($userId) {
+            $groupIds = \App\Models\Group::query()
+                ->where('user_id', $userId)
+                ->orWhereHas('users', function ($q) use ($userId) {
+                    $q->where('users.id', $userId)
+                        ->where('group_user.status', 'accepted');
+                })
+                ->pluck('id');
+            $query->whereIn('group_id', $groupIds);
+        } else {
+            $query->whereRaw('1 = 0');
+        }
+
         return $query->with(['actor', 'subject', 'group'])->latest()->paginate(10);
     }
 

@@ -14,7 +14,11 @@ use Illuminate\Validation\ValidationException;
 
 class LegalCaseOpinionServices
 {
-    public function __construct(protected LegalCaseRepository $repo) {}
+    public function __construct(
+        protected LegalCaseRepository $repo,
+        protected PointsService $points,
+        protected GroupEventService $events,
+    ) {}
 
 
     public function createOpinion($request)
@@ -238,6 +242,14 @@ class LegalCaseOpinionServices
             auth()->id(),
             $legalCase->judge?->user_id
         );
+
+        // Mirror into the group chat (bell already sent to the judge).
+        if ($legalCase->group) {
+            $this->events->postChat(
+                $legalCase->group,
+                'تم طلب استئناف في قضية: ' . $legalCase->title,
+            );
+        }
     }
 
     private function notifyJudgeOnAppealRequest($legalCase): void
@@ -301,6 +313,9 @@ class LegalCaseOpinionServices
                 'user_id' => $user->id,
                 'role' => CaseRole::CONSULTANT->value,
             ]);
+
+            // Consultant is now a party to the case → award participation points.
+            $this->points->onConsultantParticipation($legalCase, $user->id);
 
             return CaseRole::CONSULTANT->value;
         }

@@ -10,7 +10,23 @@ use Illuminate\Validation\ValidationException;
 
 class GroupLawService
 {
-    public function __construct(protected GroupLawRepository $repo, protected MessageService $messageService , protected GroupPermissionService $permissionService) {}
+    public function __construct(protected GroupLawRepository $repo, protected MessageService $messageService , protected GroupPermissionService $permissionService, protected GroupEventService $events) {}
+
+    /** Fans an owner-enacted law change out to the bell, news feed and chat. */
+    private function announceLaw(int $groupId, string $ar, string $en): void
+    {
+        $group = Group::find($groupId);
+        if (! $group) {
+            return;
+        }
+        $this->events->notifyGroupEvent(
+            $group,
+            'law_changed',
+            title: ['ar' => 'تغيير في القوانين', 'en' => 'Law changed'],
+            body: ['ar' => $ar, 'en' => $en],
+            actor: auth('sanctum')->user(),
+        );
+    }
 
     public function index($groupId)
     {
@@ -33,11 +49,17 @@ class GroupLawService
         $this->checkMembership($data['group_id']);
 
         if ($this->isGroupOwner($data['group_id'])) {
-            return $this->repo->create([
+            $law = $this->repo->create([
                 'group_id' => $data['group_id'],
                 'description' => $data['description'],
                 'reason' => $data['reason'] ?? null,
             ]);
+            $this->announceLaw(
+                (int) $data['group_id'],
+                'تم سنّ قانون جديد: ' . $data['description'],
+                'New law enacted: ' . $data['description'],
+            );
+            return $law;
         }
 
         return $this->createPoll($data, ChatPollType::CREATE_LAW->value);
@@ -48,10 +70,16 @@ class GroupLawService
         $this->checkMembership($groupLaw->group_id);
 
         if ($this->isGroupOwner($groupLaw->group_id)) {
-            return $this->repo->update($groupLaw, [
+            $updated = $this->repo->update($groupLaw, [
                 'description' => $data['description'],
                 'reason' => $data['reason']
             ]);
+            $this->announceLaw(
+                (int) $groupLaw->group_id,
+                'تم تعديل قانون: ' . $data['description'],
+                'Law amended: ' . $data['description'],
+            );
+            return $updated;
         }
 
         return $this->createPoll(array_merge($data, ['group_law_id' => $groupLaw->id , 'group_id' => $groupLaw->group_id]), ChatPollType::UPDATE_LAW->value);
@@ -62,7 +90,15 @@ class GroupLawService
         $this->checkMembership($groupLaw->group_id);
 
         if ($this->isGroupOwner($groupLaw->group_id)) {
-            return $this->repo->delete($groupLaw);
+            $groupId = (int) $groupLaw->group_id;
+            $description = $groupLaw->description;
+            $result = $this->repo->delete($groupLaw);
+            $this->announceLaw(
+                $groupId,
+                'تم حذف قانون: ' . $description,
+                'Law removed: ' . $description,
+            );
+            return $result;
         }
 
         return $this->createPoll(array_merge($data, ['group_law_id' => $groupLaw->id , 'group_id' => $groupLaw->group_id]), ChatPollType::DELETE_LAW->value);

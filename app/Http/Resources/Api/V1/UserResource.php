@@ -52,7 +52,13 @@ class UserResource extends JsonResource
             'plaintiff_wins_count' => $this->plaintiff_wins_count ,
             'plaintiff_losses_count' => $this->plaintiff_losses_count ,
             'defendant_wins_count' => $this->defendant_wins_count,
-            'defendant_losses_count' => $this->defendant_losses_count
+            'defendant_losses_count' => $this->defendant_losses_count,
+            // Present only where the caller resolved it (group members list) —
+            // the submit-case form reads it to red-flag an immune defendant.
+            'has_immunity' => $this->when(
+                ! is_null($this->has_immunity),
+                fn () => (bool) $this->has_immunity
+            ),
 
         ];
     }

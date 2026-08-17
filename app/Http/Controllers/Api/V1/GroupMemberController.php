@@ -9,12 +9,16 @@ use App\Http\Resources\Api\V1\UserResource;
 use App\Models\Group;
 use App\Models\User;
 use App\Services\GroupMemberService;
+use App\Services\GroupPermissionService;
 use Illuminate\Http\Request;
 
 class GroupMemberController extends Controller
 {
 
-   public function __construct(protected GroupMemberService $groupMemberService) {}
+   public function __construct(
+      protected GroupMemberService $groupMemberService,
+      protected GroupPermissionService $permissionService,
+   ) {}
 
    /**
     * @return \Illuminate\Http\JsonResponse
@@ -23,6 +27,20 @@ class GroupMemberController extends Controller
    public function index(Group $group)
    {
       $grouped = $this->groupMemberService->getGroupMembers($group);
+
+      // Flag lawsuit immunity per member so the submit-case form can red-note an
+      // immune defendant BEFORE the server 422s. Resolved once for the whole
+      // group (no N+1). A court officer is un-suable by role too; this covers
+      // the citizen-with-granted-immunity case the app can't infer.
+      $immune = array_flip(
+         $this->permissionService->usersWithPermission($group, 'lawsuit_immunity')
+      );
+      foreach ($grouped as $bucket) {
+         foreach ($bucket as $user) {
+            $user->setAttribute('has_immunity', isset($immune[(int) $user->id]));
+         }
+      }
+
       return \responder::success([
          'judge' => UserResource::collection($grouped['judge'] ?? []),
          'consultant' => UserResource::collection($grouped['consultant'] ?? []),

@@ -8,7 +8,10 @@ class PermissionService
 {
 
 
-    public function __construct(protected PermissionRepository $repo) {}
+    public function __construct(
+        protected PermissionRepository $repo,
+        protected GroupEventService $events,
+    ) {}
 
     public function getPermissionsWithState($groupId, $userId = null, $role = null)
     {
@@ -63,13 +66,17 @@ class PermissionService
 
             if ($existing) {
                 $existing->delete();
+                $granted = false;
             } else {
                 \App\Models\GroupUserPermission::create([
                     'group_id' => $groupId,
                     'user_id' => $userId,
                     'permission_id' => $permissionId,
                 ]);
+                $granted = true;
             }
+            $subject = \App\Models\User::find($userId);
+            $subjectLabel = ['ar' => $subject?->name ?? '', 'en' => $subject?->name ?? ''];
         } else {
             $existing = \App\Models\GroupRolePermission::where('group_id', $groupId)
                 ->where('role', $role)
@@ -78,13 +85,55 @@ class PermissionService
 
             if ($existing) {
                 $existing->delete();
+                $granted = false;
             } else {
                 \App\Models\GroupRolePermission::create([
                     'group_id' => $groupId,
                     'role' => $role,
                     'permission_id' => $permissionId,
                 ]);
+                $granted = true;
             }
+            $subjectLabel = $this->roleLabels((string) $role);
         }
+
+        $this->announcePermissionChange($groupId, $permissionId, $subjectLabel, $granted);
+    }
+
+    /** Localized role labels for event copy. */
+    private function roleLabels(string $role): array
+    {
+        return match ($role) {
+            'judge' => ['ar' => 'القضاة', 'en' => 'judges'],
+            'lawyer' => ['ar' => 'المحامين', 'en' => 'lawyers'],
+            'consultant' => ['ar' => 'المستشارين', 'en' => 'consultants'],
+            default => ['ar' => 'المواطنين', 'en' => 'citizens'],
+        };
+    }
+
+    /** Fans a permission grant/revoke out to the bell, news feed and chat. */
+    private function announcePermissionChange($groupId, $permissionId, array $subjectLabel, bool $granted): void
+    {
+        $group = \App\Models\Group::find($groupId);
+        $permission = \App\Models\Permission::find($permissionId);
+        if (! $group || ! $permission) {
+            return;
+        }
+
+        $permAr = $permission->getTranslation('name', 'ar');
+        $permEn = $permission->getTranslation('name', 'en');
+        $verbAr = $granted ? 'مُنحت' : 'سُحبت';
+        $verbEn = $granted ? 'granted to' : 'revoked from';
+
+        $this->events->notifyGroupEvent(
+            $group,
+            'permission_changed',
+            title: ['ar' => 'تغيير صلاحية', 'en' => 'Permission changed'],
+            body: [
+                'ar' => 'صلاحية "' . $permAr . '" ' . $verbAr . ' لـ' . $subjectLabel['ar'],
+                'en' => 'Permission "' . $permEn . '" ' . $verbEn . ' ' . $subjectLabel['en'],
+            ],
+            actor: auth()->user(),
+        );
     }
 }

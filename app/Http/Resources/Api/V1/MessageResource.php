@@ -14,7 +14,8 @@ class MessageResource extends JsonResource
             'group_id' => $this->relationLoaded('chat') ? $this->chat?->group_id : null,
             'chat_id' => $this->chat_id,
             'user_id' => $this->user_id,
-            'user' => $this->relationLoaded('user') ? [
+            // Null user for a system message (user_id null) — guard the deref.
+            'user' => $this->relationLoaded('user') && $this->user ? [
                 'id' => $this->user->id,
                 'name' => $this->user->name,
                 'image' => $this->user->image,

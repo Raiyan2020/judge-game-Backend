@@ -11,6 +11,12 @@ class LegalCaseListResource extends JsonResource
         return [
             'id' => $this->id,
             'title' => $this->title,
+            // First evidence image, so the list card shows the case's own photo
+            // instead of a placeholder (the detail screen already renders all
+            // media). Null when there's no image or media wasn't eager-loaded.
+            'image' => $this->relationLoaded('media')
+                ? $this->getMedia('images')->first()?->getFullUrl()
+                : null,
             'plaintiff' => $this->whenLoaded('plaintiff', function () {
                 return [
                     'id' => $this->plaintiff?->user?->id,

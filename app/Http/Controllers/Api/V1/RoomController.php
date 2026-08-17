@@ -48,6 +48,12 @@ class RoomController extends Controller
         return \responder::success(__('Left room successfully'));
     }
 
+    public function endRoom(Room $room)
+    {
+        $this->roomService->endRoom($room);
+        return \responder::success(__('Room ended successfully'));
+    }
+
     public function toggleMute(Room $room)
     {
         $this->roomService->toggleMute($room);

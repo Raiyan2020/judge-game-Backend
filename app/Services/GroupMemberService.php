@@ -13,8 +13,22 @@ use Illuminate\Validation\ValidationException;
 
 class GroupMemberService
 {
-    public function __construct(protected GroupRepository $repo , protected GroupPermissionService $permissionService)
+    public function __construct(
+        protected GroupRepository $repo,
+        protected GroupPermissionService $permissionService,
+        protected GroupEventService $events,
+    ) {
+    }
+
+    /** Localized role labels for event copy. */
+    private function roleLabels(string $role): array
     {
+        return match ($role) {
+            GroupRole::JUDGE->value => ['ar' => 'قاضٍ', 'en' => 'Judge'],
+            GroupRole::LAWYER->value => ['ar' => 'محامٍ', 'en' => 'Lawyer'],
+            GroupRole::CONSULTANT->value => ['ar' => 'مستشار', 'en' => 'Consultant'],
+            default => ['ar' => 'مواطن', 'en' => 'Citizen'],
+        };
     }
 
    public function getGroupMembers($group)
@@ -285,6 +299,20 @@ class GroupMemberService
         $group->users()->updateExistingPivot($userId, ['role' => $newRole]);
 
         DB::commit();
+
+        // Announce the promotion/change on all three channels (bell, news, chat).
+        $label = $this->roleLabels($newRole);
+        $this->events->notifyGroupEvent(
+            $group,
+            'role_changed',
+            title: ['ar' => 'تغيير منصب', 'en' => 'Role changed'],
+            body: [
+                'ar' => 'أصبح ' . $member->name . ' الآن ' . $label['ar'],
+                'en' => $member->name . ' is now a ' . $label['en'],
+            ],
+            actor: $currentUser,
+        );
+
         return true;
     }
 

@@ -18,6 +18,9 @@ class LegalCaseResource extends JsonResource
             'title' => $this->title,
             'description' => $this->description,
             'my_role' => $this->myRole(),
+            // True for a group consultant not yet on this case → the app shows
+            // the "give a consultation" entry (initiating self-assigns them).
+            'can_consult' => $this->canConsult(),
             'status' => $this->status,
             'status_text' => __($this->status),
             'damages' => $this->damages,

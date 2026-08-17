@@ -18,8 +18,19 @@ class LegalCaseJudgmentService
 {
     public function __construct(
         protected LegalCaseJudgmentRepository $judgmentRepo,
-        protected LegalCaseRepository $legalCaseRepo
+        protected LegalCaseRepository $legalCaseRepo,
+        protected PointsService $points,
+        protected GroupEventService $events
     ) {}
+
+    /** Mirrors a case event into the group chat (bell + news already sent). */
+    private function postCaseChat(LegalCase $legalCase, string $ar): void
+    {
+        $group = $legalCase->group;
+        if ($group) {
+            $this->events->postChat($group, $ar . ': ' . $legalCase->title);
+        }
+    }
 
     public function storeFirstJudgment(array $data)
     {
@@ -57,6 +68,7 @@ class LegalCaseJudgmentService
             ]);
 
             $this->createCaseNews($legalCase, $judgment);
+            $this->postCaseChat($legalCase, 'صدر حكم أول درجة في قضية');
             $winnerId = null;
 
             if ($data['judgment_type'] === LegalCaseJudgmentType::ACQUITTAL->value) {
@@ -68,6 +80,10 @@ class LegalCaseJudgmentService
             } else {
                 $legalCase->update(['status' => LegalCaseStatus::ONGOING->value]);
             }
+
+            // Award role points for the first-instance ruling (judge; acquittal
+            // also pays the winning defendant side).
+            $this->points->onFirstJudgment($legalCase, $data['judgment_type']);
 
             DB::commit();
 
@@ -124,6 +140,10 @@ class LegalCaseJudgmentService
             $legalCase->update(['status' => LegalCaseStatus::EXECUTION->value, 'winner_id' => $data['judgment_type'] === LegalCaseJudgmentType::CONVICTION->value ? $legalCase->plaintiff?->user_id : $legalCase->defendant?->user_id]);
 
             $this->createFinalJudgmentNews($legalCase, $judgment);
+            $this->postCaseChat($legalCase, 'صدر الحكم النهائي في قضية');
+
+            // Award role points for the appeal (final) ruling.
+            $this->points->onFinalJudgment($legalCase, $data['judgment_type']);
 
             DB::commit();
 
@@ -305,6 +325,11 @@ class LegalCaseJudgmentService
             }
 
             $this->createAcceptanceNews($legalCase, $judgment);
+            $this->postCaseChat($legalCase, 'تم قبول الحكم وإغلاق قضية');
+
+            // The defendant lawyer accepted the conviction → plaintiff side won.
+            $this->points->onJudgmentAccepted($legalCase);
+
             DB::commit();
 
             return $legalCase;

@@ -11,12 +11,11 @@ class LegalCaseListResource extends JsonResource
         return [
             'id' => $this->id,
             'title' => $this->title,
-            // First evidence image, so the list card shows the case's own photo
-            // instead of a placeholder (the detail screen already renders all
-            // media). Null when there's no image or media wasn't eager-loaded.
-            'image' => $this->relationLoaded('media')
-                ? $this->getMedia('images')->first()?->getFullUrl()
-                : null,
+            // The cover is deliberately NOT an evidence image (JG-038): evidence
+            // is filing-time attachments, not a case photo, so using it as the
+            // cover was wrong. The card falls back to its default artwork; the
+            // evidence stays only in the attachments section.
+            'image' => null,
             'plaintiff' => $this->whenLoaded('plaintiff', function () {
                 return [
                     'id' => $this->plaintiff?->user?->id,

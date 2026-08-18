@@ -48,7 +48,10 @@ class GroupLawService
     {
         $this->checkMembership($data['group_id']);
 
-        if ($this->isGroupOwner($data['group_id'])) {
+        // Owner OR a member granted `add_laws` enacts directly; everyone else
+        // opens a vote. Previously ONLY the owner enacted, so a granted member's
+        // permission was inert (JG-025).
+        if ($this->canEnact($data['group_id'], 'add_laws')) {
             $law = $this->repo->create([
                 'group_id' => $data['group_id'],
                 'description' => $data['description'],
@@ -69,7 +72,7 @@ class GroupLawService
     {
         $this->checkMembership($groupLaw->group_id);
 
-        if ($this->isGroupOwner($groupLaw->group_id)) {
+        if ($this->canEnact($groupLaw->group_id, 'edit_law')) {
             $updated = $this->repo->update($groupLaw, [
                 'description' => $data['description'],
                 'reason' => $data['reason']
@@ -89,7 +92,7 @@ class GroupLawService
     {
         $this->checkMembership($groupLaw->group_id);
 
-        if ($this->isGroupOwner($groupLaw->group_id)) {
+        if ($this->canEnact($groupLaw->group_id, 'delete_law')) {
             $groupId = (int) $groupLaw->group_id;
             $description = $groupLaw->description;
             $result = $this->repo->delete($groupLaw);
@@ -102,6 +105,22 @@ class GroupLawService
         }
 
         return $this->createPoll(array_merge($data, ['group_law_id' => $groupLaw->id , 'group_id' => $groupLaw->group_id]), ChatPollType::DELETE_LAW->value);
+    }
+
+    /**
+     * Whether the current user may enact a law change directly (skip the vote):
+     * the group owner, or a member granted [$permissionKey]
+     * (add_laws / edit_law / delete_law). hasPermission already owner-short-
+     * circuits, but resolving the group once keeps this readable.
+     */
+    protected function canEnact($groupId, string $permissionKey): bool
+    {
+        $group = Group::findOrFail($groupId);
+        return $this->permissionService->hasPermission(
+            (int) auth('sanctum')->id(),
+            $group,
+            $permissionKey,
+        );
     }
 
     protected function createPoll(array $data, string $type)

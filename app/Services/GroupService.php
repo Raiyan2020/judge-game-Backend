@@ -70,6 +70,36 @@ class GroupService
         return $groups;
     }
 
+    /**
+     * The "best groups" board (JG-010): every group ordered by its summed
+     * member points, each carrying points, rank and member count. Was empty —
+     * there was no endpoint for it.
+     */
+    public function bestGroups()
+    {
+        [$pointsByGroup, $rankByGroup] = $this->groupRanking();
+
+        $groups = \App\Models\Group::query()
+            ->withCount('users')
+            ->get();
+
+        foreach ($groups as $group) {
+            $group->points = $pointsByGroup[$group->id] ?? 0;
+            $group->global_rank = $rankByGroup[$group->id] ?? 0;
+        }
+
+        // Exclude memberless groups: they never appear in the points ranking
+        // (rank 0), so leaving them in would sort an empty group ABOVE rank 1 —
+        // a 0-member group topping the "best groups" board (JG-010). Then order
+        // by rank (highest points first), and renumber positions 1..N.
+        $ranked = $groups
+            ->filter(fn ($g) => (int) $g->users_count > 0 && (int) $g->global_rank > 0)
+            ->sortBy('global_rank')
+            ->values();
+
+        return $ranked;
+    }
+
     /// Returns [pointsByGroupId, rankByGroupId] for every group, ranked by the
     /// summed member points (standard competition ranking: ties share a rank).
     private function groupRanking(): array

@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\ChangeRoleRequest;
 use App\Http\Requests\Api\V1\GroupRequest;
 use App\Http\Requests\Api\V1\GroupUpdateRequest;
+use App\Http\Resources\Api\V1\BestGroupResource;
 use App\Http\Resources\Api\V1\GroupInvitationResource;
 use App\Http\Resources\Api\V1\GroupResource;
 use App\Models\Group;
@@ -27,6 +28,14 @@ class GroupController extends Controller
    public function index()
    {
       return  \responder::success(GroupResource::collection($this->groupService->index()));
+   }
+
+   /** The "best groups" leaderboard, ranked by summed member points (JG-010). */
+   public function bestGroups()
+   {
+      return \responder::success(
+          BestGroupResource::collection($this->groupService->bestGroups())
+      );
    }
 
    public function store(GroupRequest $request)

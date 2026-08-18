@@ -34,9 +34,13 @@ class LegalCaseRequest extends FormRequest
             'images' => 'nullable|array',
             'images.*' => 'image|max:10240',
             'videos' => 'nullable|array',
-            'videos.*' => 'mimes:mp4,mov,avi|max:10240',
+            // Validate by real MIME, not extension: a camera video (iOS
+            // video/quicktime .mov, Android video/mp4 / 3gpp) failed `mimes:`
+            // extension-guessing. Cap raised to 50MB — camera clips exceed 10MB.
+            // (JG-030; also raise php.ini upload_max_filesize/post_max_size.)
+            'videos.*' => 'mimetypes:video/mp4,video/quicktime,video/x-msvideo,video/3gpp,video/x-matroska|max:51200',
             'audios' => 'nullable|array',
-            'audios.*' => 'mimes:mp3,wav,m4a|max:10240',
+            'audios.*' => 'mimetypes:audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/x-m4a,audio/aac|max:20480',
         ];
     }
 

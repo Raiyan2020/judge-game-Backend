@@ -24,6 +24,8 @@ class MessageService
         $query = ChatMessage::query()->with([
             'user',
             'chat',
+            // The targeted law, so an edit/delete poll can show before → after.
+            'poll.groupLaw',
             'poll.options' => function ($q) use ($userId) {
                 $q->withCount('votes')
                   ->withCount(['votes as mine_count' => function ($v) use ($userId) {
@@ -306,6 +308,7 @@ class MessageService
 
         if ($group) {
             $this->checkMembership($group);
+            $this->assertCanVote($group);
         }
 
         // Closed OR past its expiry — the app also stops sending a vote here.
@@ -338,6 +341,40 @@ class MessageService
         }
 
         return $vote;
+    }
+
+    /**
+     * Enforces the `vote_rights` permission WITHOUT breaking the default open
+     * voting the poll system relies on. Permissions are deny-by-default with no
+     * default grants, so hard-gating every vote would let non-owners never vote
+     * (and no non-owner law proposal could ever pass). Instead this is opt-in:
+     * voting stays open until an admin GRANTS `vote_rights` to at least one role
+     * or user in the group — from then on it's a real gate (owner always votes;
+     * others need the grant). JG-025.
+     */
+    private function assertCanVote(Group $group): void
+    {
+        $userId = (int) auth('sanctum')->id();
+        if ($group->user_id === $userId) {
+            return; // Owner always votes.
+        }
+
+        $permissionId = \App\Models\Permission::where('key', 'vote_rights')->value('id');
+        if (! $permissionId) {
+            return; // Permission not seeded → don't gate.
+        }
+
+        $configured = $group->permissions()->where('permission_id', $permissionId)->exists()
+            || $group->userPermissions()->where('permission_id', $permissionId)->exists();
+        if (! $configured) {
+            return; // Nobody restricted voting yet → stays open (backward compat).
+        }
+
+        if (! app(GroupPermissionService::class)->hasPermission($userId, $group, 'vote_rights')) {
+            throw ValidationException::withMessages([
+                'vote' => __('You do not have voting rights in this group'),
+            ]);
+        }
     }
 
     /**

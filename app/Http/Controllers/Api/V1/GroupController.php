@@ -31,10 +31,10 @@ class GroupController extends Controller
    }
 
    /** The "best groups" leaderboard, ranked by summed member points (JG-010). */
-   public function bestGroups()
+   public function bestGroups(\Illuminate\Http\Request $request)
    {
       return \responder::success(
-          BestGroupResource::collection($this->groupService->bestGroups())
+          BestGroupResource::collection($this->groupService->bestGroups($request->country_id))
       );
    }
 

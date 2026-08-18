@@ -61,7 +61,7 @@ class GroupService
         // and its global rank among all groups, so the app shows live values
         // instead of a hardcoded placeholder. One ranking query for the whole
         // table, then a lookup per returned group.
-        [$pointsByGroup, $rankByGroup] = $this->groupRanking();
+        [$pointsByGroup, $rankByGroup, $detailsByGroup] = $this->groupRanking();
         foreach ($groups as $group) {
             $group->points = $pointsByGroup[$group->id] ?? 0;
             $group->global_rank = $rankByGroup[$group->id] ?? 0;
@@ -75,17 +75,27 @@ class GroupService
      * member points, each carrying points, rank and member count. Was empty —
      * there was no endpoint for it.
      */
-    public function bestGroups()
+    public function bestGroups(?int $countryId = null)
     {
-        [$pointsByGroup, $rankByGroup] = $this->groupRanking();
+        [$pointsByGroup, $rankByGroup, $detailsByGroup] = $this->groupRanking($countryId);
 
         $groups = \App\Models\Group::query()
             ->withCount('users')
+            ->when($countryId, function ($q) use ($countryId) {
+                $q->whereHas('owner', function ($uq) use ($countryId) {
+                    $uq->where('country_id', $countryId);
+                });
+            })
             ->get();
 
         foreach ($groups as $group) {
             $group->points = $pointsByGroup[$group->id] ?? 0;
             $group->global_rank = $rankByGroup[$group->id] ?? 0;
+            $details = $detailsByGroup[$group->id] ?? [];
+            $group->judge_points = $details['judge_points'] ?? 0;
+            $group->lawyer_points = $details['lawyer_points'] ?? 0;
+            $group->consultant_points = $details['consultant_points'] ?? 0;
+            $group->citizen_points = $details['citizen_points'] ?? 0;
         }
 
         // Exclude memberless groups: they never appear in the points ranking
@@ -100,19 +110,34 @@ class GroupService
         return $ranked;
     }
 
-    /// Returns [pointsByGroupId, rankByGroupId] for every group, ranked by the
+    /// Returns [pointsByGroupId, rankByGroupId, detailsByGroup] for every group, ranked by the
     /// summed member points (standard competition ranking: ties share a rank).
-    private function groupRanking(): array
+    private function groupRanking(?int $countryId = null): array
     {
-        $ranking = DB::table('group_user')
+        $query = \Illuminate\Support\Facades\DB::table('group_user')
             ->leftJoin('points', 'points.user_id', '=', 'group_user.user_id')
-            ->select('group_user.group_id', DB::raw('COALESCE(SUM(points.total_points),0) as pts'))
+            ->select(
+                'group_user.group_id', 
+                \Illuminate\Support\Facades\DB::raw('COALESCE(SUM(points.total_points),0) as pts'),
+                \Illuminate\Support\Facades\DB::raw('COALESCE(SUM(points.judge_points),0) as judge_pts'),
+                \Illuminate\Support\Facades\DB::raw('COALESCE(SUM(points.lawyer_points),0) as lawyer_pts'),
+                \Illuminate\Support\Facades\DB::raw('COALESCE(SUM(points.consultant_points),0) as consultant_pts'),
+                \Illuminate\Support\Facades\DB::raw('COALESCE(SUM(points.citizen_points),0) as citizen_pts')
+            )
             ->groupBy('group_user.group_id')
-            ->orderByDesc('pts')
-            ->get();
+            ->orderByDesc('pts');
+
+        if ($countryId) {
+            $query->join('groups', 'groups.id', '=', 'group_user.group_id')
+                  ->join('users', 'users.id', '=', 'groups.user_id')
+                  ->where('users.country_id', $countryId);
+        }
+
+        $ranking = $query->get();
 
         $pointsByGroup = [];
         $rankByGroup = [];
+        $detailsByGroup = [];
         $rank = 0;
         $seen = 0;
         $prevPts = null;
@@ -124,9 +149,15 @@ class GroupService
             }
             $pointsByGroup[$row->group_id] = (int) $row->pts;
             $rankByGroup[$row->group_id] = $rank;
+            $detailsByGroup[$row->group_id] = [
+                'judge_points' => (int) $row->judge_pts,
+                'lawyer_points' => (int) $row->lawyer_pts,
+                'consultant_points' => (int) $row->consultant_pts,
+                'citizen_points' => (int) $row->citizen_pts,
+            ];
         }
 
-        return [$pointsByGroup, $rankByGroup];
+        return [$pointsByGroup, $rankByGroup, $detailsByGroup];
     }
 
     public function getGroupMembers($group)

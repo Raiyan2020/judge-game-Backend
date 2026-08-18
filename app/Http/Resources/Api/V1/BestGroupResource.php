@@ -18,6 +18,10 @@ class BestGroupResource extends JsonResource
             'name' => $this->name,
             'image' => $this->image,
             'points' => (int) ($this->points ?? 0),
+            'judge_points' => (int) ($this->judge_points ?? 0),
+            'consultant_points' => (int) ($this->consultant_points ?? 0),
+            'lawyer_points' => (int) ($this->lawyer_points ?? 0),
+            'citizen_points' => (int) ($this->citizen_points ?? 0),
             'rank' => (int) ($this->global_rank ?? 0),
             'members_count' => (int) ($this->users_count ?? 0),
         ];

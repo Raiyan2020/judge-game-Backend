@@ -8,9 +8,6 @@
         $earnedActions = $role === 'citizen'
             ? $actions->reject(fn ($action) => $action->isCitizenAgainstAction())->values()
             : $actions;
-        $againstActions = $role === 'citizen'
-            ? $actions->filter(fn ($action) => $action->isCitizenAgainstAction())->values()
-            : collect();
     @endphp
 
     <div class="content-body">
@@ -37,17 +34,6 @@
                                     'actions' => $earnedActions,
                                     'startIndex' => $inputIndex,
                                     'sectionTitle' => $role === 'citizen' ? __('citizen earned points') : null,
-                                ])
-                                @php $inputIndex += $earnedActions->count(); @endphp
-                            @endif
-
-                            @if ($againstActions->isNotEmpty())
-                                @include('dashboard.role-actions.partials.actions-table', [
-                                    'actions' => $againstActions,
-                                    'startIndex' => $inputIndex,
-                                    'sectionTitle' => __('citizen against points'),
-                                    'sectionHint' => __('citizen against points hint'),
-                                    'hideHeader' => $earnedActions->isNotEmpty(),
                                 ])
                             @endif
 

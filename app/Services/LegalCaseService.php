@@ -15,7 +15,7 @@ use Illuminate\Validation\ValidationException;
 
 class LegalCaseService
 {
-    public function __construct(protected LegalCaseRepository $repo, protected GroupRepository $groupRepo, protected GroupPermissionService $groupPermissionService, protected GroupEventService $events) {}
+    public function __construct(protected LegalCaseRepository $repo, protected GroupRepository $groupRepo, protected GroupPermissionService $groupPermissionService, protected GroupEventService $events, protected PointsService $points) {}
 
     public function index($filters, $groupId)
     {
@@ -187,6 +187,11 @@ class LegalCaseService
             $legalCase->participants()->createMany($participants);
             $legalCase->groupLaws()->attach($request['group_law_ids']);
             $this->createCaseNews($legalCase, $userId, $participants);
+
+            // Credit the plaintiff for filing — the citizen points the profile
+            // shows and the post-filing "reward" popup promises. Idempotent per
+            // case; kept in the transaction so it commits atomically with the case.
+            $this->points->onCaseFiled($legalCase, $userId);
 
             // Register BEFORE committing so the callback fires AFTER the real
             // commit. Called after `DB::commit()` (no active transaction) it

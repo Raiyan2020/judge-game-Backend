@@ -18,7 +18,7 @@ class RoomRepository extends BaseRepository
     public function index($request = [])
     {
         return $this->model
-        ->with('users', 'group')
+        ->with('users', 'group', 'admin')
         ->withCount('users')
         ->when(isset($request['group_id']), function($query) use ($request) {
             $query->where('group_id', $request['group_id']);

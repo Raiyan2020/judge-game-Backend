@@ -26,6 +26,13 @@ class LegalCaseResource extends JsonResource
             'damages' => $this->damages,
             'final_judgment' => $this->relationLoaded('finalJudgment') && $this->finalJudgment ? $this->finalJudgment?->judgment_type : null,
 
+            // True once any hearing has been scheduled for this case, so the app
+            // can hide/disable the "تحديد جلسة" action instead of letting it be
+            // re-tapped after a successful schedule.
+            'has_scheduled_hearing' => $this->relationLoaded('hearings')
+                ? $this->hearings->where('status', 'scheduled')->isNotEmpty()
+                : false,
+
             'group' =>  $this->relationLoaded('group') ? [
                 'id' => $this->group?->id,
                 'name' => $this->group?->name,

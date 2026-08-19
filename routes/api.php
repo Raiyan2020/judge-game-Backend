@@ -123,6 +123,10 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::post('coupons', [CouponController::class, 'store']);
         Route::get('permissions', [PermissionController::class, 'index']);
         Route::post('permissions', [PermissionController::class, 'togglePermission']);
+        // The signed-in member's OWN effective permission keys in a group (owner
+        // holds all). Member-callable — unlike `index`, which is owner-only — so
+        // the app can reveal the action entry points a granted member may use.
+        Route::get('my-permissions', [PermissionController::class, 'mine']);
         Route::get('rooms/{room}/token', [AgoraController::class, 'generateToken']);
         Route::get('rooms', [RoomController::class, 'index']);
         Route::post('rooms', [RoomController::class, 'store']);

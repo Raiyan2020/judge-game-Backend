@@ -24,11 +24,14 @@ class UserCaseStatsResource extends JsonResource
             // `participated_cases`, not `participated_judges`: the app reads the
             // former (with the latter only as a legacy fallback), and this
             // default used to disagree with every producer of the value.
+            // case_stats carries both the legacy 4 fields AND a role-specific
+            // `tiles` list (JG-008/JG-017) — the app prefers tiles when present.
             'case_stats' => $this->case_stats ?? [
                 'participated_cases' => 0,
                 'appeal_judgments' => 0,
                 'acquittal_judgments' => 0,
                 'first_instance_judgments' => 0,
+                'tiles' => [],
             ],
         ];
     }

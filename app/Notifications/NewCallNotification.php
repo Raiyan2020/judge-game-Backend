@@ -33,6 +33,11 @@ class NewCallNotification extends Notification
                 'en' => $this->data['body']['en'] ?? null,
             ],
             'type' => $this->data['type'] ?? 'call',
+            // Present only for a private-room invite: the plaintext room password
+            // the invitee needs to join. Stored in the DB notification `data`
+            // (read over auth:sanctum by the in-app bell); FcmChannel never copies
+            // it into the push body. Absent/null for public rooms.
+            'room_password' => $this->data['room_password'] ?? null,
         ];
     }
 }

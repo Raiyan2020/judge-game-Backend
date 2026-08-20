@@ -31,7 +31,7 @@ class RoomController extends Controller
 
     public function show(Room $room)
     {
-        return \responder::success( new RoomResource($room->load('users', 'group')->loadCount('users')));
+        return \responder::success( new RoomResource($room->load('users', 'group', 'admin')->loadCount('users')));
     }
 
     public function store(CreateRoomRequest $request)
@@ -43,7 +43,7 @@ class RoomController extends Controller
     public function join(Room $room , JoinRoomRequest $request)
     {
         $this->roomService->join($room, $request->validated());
-        return \responder::success( new RoomResource($room->load('users', 'group')->loadCount('users')));
+        return \responder::success( new RoomResource($room->load('users', 'group', 'admin')->loadCount('users')));
 
     }
 

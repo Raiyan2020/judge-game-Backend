@@ -9,6 +9,7 @@ use App\Models\ChatMessage;
 use App\Models\ChatPoll;
 use App\Models\Group;
 use App\Models\GroupLaw;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class MessageService
@@ -24,6 +25,8 @@ class MessageService
         $query = ChatMessage::query()->with([
             'user',
             'chat',
+            // The targeted law, so an edit/delete poll can show before → after.
+            'poll.groupLaw',
             'poll.options' => function ($q) use ($userId) {
                 $q->withCount('votes')
                   ->withCount(['votes as mine_count' => function ($v) use ($userId) {
@@ -219,11 +222,19 @@ class MessageService
 
         $chat = $this->getChatByGroupId($data['group_id']);
 
-        $message = $this->createPollMessage($chat->id);
+        // The message + poll + options must be created atomically. Without a
+        // transaction, a failure after createPollMessage() left an orphan
+        // `type=poll` ChatMessage with NO ChatPoll row — which the app rendered
+        // as a BLANK chat bubble ("the announcement published empty") while the
+        // request itself still 500'd. Rolling back means a failed publish leaves
+        // no trace in the timeline.
+        [$message, $poll] = DB::transaction(function () use ($chat, $data) {
+            $message = $this->createPollMessage($chat->id);
+            $poll = $this->createPollRecord($message->id, $data, ChatPollType::ADS->value);
+            $this->createPollOptions($poll, $data['options'] ?? null);
 
-        $poll = $this->createPollRecord($message->id, $data, ChatPollType::ADS->value);
-
-        $this->createPollOptions($poll, $data['options'] ?? null);
+            return [$message, $poll];
+        });
 
         // Broadcast the poll message so other members see the announcement live,
         // exactly like a text message (fail-soft — a broadcast error must never
@@ -268,7 +279,8 @@ class MessageService
     {
         return ChatPoll::create([
             'chat_message_id' => $messageId,
-            'user_id' => auth('sanctum')->id(),
+            // No 'user_id' — chat_polls has no such column (the INSERT 500'd);
+            // the proposer is the owning chat_message's user_id.
             'type' => $type,
             'group_law_id' => $data['group_law_id'] ?? null,
             'data' => [
@@ -306,6 +318,7 @@ class MessageService
 
         if ($group) {
             $this->checkMembership($group);
+            $this->assertCanVote($group);
         }
 
         // Closed OR past its expiry — the app also stops sending a vote here.
@@ -338,6 +351,40 @@ class MessageService
         }
 
         return $vote;
+    }
+
+    /**
+     * Enforces the `vote_rights` permission WITHOUT breaking the default open
+     * voting the poll system relies on. Permissions are deny-by-default with no
+     * default grants, so hard-gating every vote would let non-owners never vote
+     * (and no non-owner law proposal could ever pass). Instead this is opt-in:
+     * voting stays open until an admin GRANTS `vote_rights` to at least one role
+     * or user in the group — from then on it's a real gate (owner always votes;
+     * others need the grant). JG-025.
+     */
+    private function assertCanVote(Group $group): void
+    {
+        $userId = (int) auth('sanctum')->id();
+        if ($group->user_id === $userId) {
+            return; // Owner always votes.
+        }
+
+        $permissionId = \App\Models\Permission::where('key', 'vote_rights')->value('id');
+        if (! $permissionId) {
+            return; // Permission not seeded → don't gate.
+        }
+
+        $configured = $group->permissions()->where('permission_id', $permissionId)->exists()
+            || $group->userPermissions()->where('permission_id', $permissionId)->exists();
+        if (! $configured) {
+            return; // Nobody restricted voting yet → stays open (backward compat).
+        }
+
+        if (! app(GroupPermissionService::class)->hasPermission($userId, $group, 'vote_rights')) {
+            throw ValidationException::withMessages([
+                'vote' => __('You do not have voting rights in this group'),
+            ]);
+        }
     }
 
     /**

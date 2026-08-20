@@ -15,7 +15,7 @@ use Illuminate\Validation\ValidationException;
 
 class LegalCaseService
 {
-    public function __construct(protected LegalCaseRepository $repo, protected GroupRepository $groupRepo, protected GroupPermissionService $groupPermissionService, protected GroupEventService $events) {}
+    public function __construct(protected LegalCaseRepository $repo, protected GroupRepository $groupRepo, protected GroupPermissionService $groupPermissionService, protected GroupEventService $events, protected PointsService $points) {}
 
     public function index($filters, $groupId)
     {
@@ -188,6 +188,11 @@ class LegalCaseService
             $legalCase->groupLaws()->attach($request['group_law_ids']);
             $this->createCaseNews($legalCase, $userId, $participants);
 
+            // Credit the plaintiff for filing — the citizen points the profile
+            // shows and the post-filing "reward" popup promises. Idempotent per
+            // case; kept in the transaction so it commits atomically with the case.
+            $this->points->onCaseFiled($legalCase, $userId);
+
             // Register BEFORE committing so the callback fires AFTER the real
             // commit. Called after `DB::commit()` (no active transaction) it
             // runs synchronously (no queue worker here), so any throw would
@@ -259,22 +264,35 @@ class LegalCaseService
         // removed here and in the app. Immunity still protects the DEFENDANT
         // side (see create()), and the head-count minimum below still applies.
 
+        // EXCEPT the group's own judge (its owner) — they preside over every case
+        // in the group, so filing one would be judging their own lawsuit
+        // (conflict of interest). JG-033.
+        if ((int) $userId === (int) $group->user_id) {
+            throw ValidationException::withMessages([
+                __('The group judge cannot file a case in their own group')
+            ]);
+        }
+
         // The minimum head-count counts ACCEPTED members only — the actual row-62
         // fix: a still-pending invitee is not yet a warm body for a fair case.
         // (`assignDefendantLawyer` already scopes counts the same way.)
         $acceptedQuery = (clone $membersQuery)->wherePivot('status', 'accepted');
 
+        // Count lawyers OTHER than the filer: the filer is the plaintiff, never a
+        // case lawyer, so a two-lawyer group where the filer is one of them still
+        // has only ONE assignable lawyer and must be blocked (mirrors the app gate
+        // `_lawyers.length < 2`, whose list already excludes the filer).
         $lawyersCount = (clone $acceptedQuery)
             ->wherePivot('role', GroupRole::LAWYER->value)
+            ->wherePivot('user_id', '!=', $userId)
             ->count();
 
-        $citizensCount = (clone $acceptedQuery)
-            ->wherePivot('role', GroupRole::CITIZEN->value)
-            ->count();
-
-        if ($lawyersCount < 2 && $citizensCount < 2) {
+        // A case needs a plaintiff lawyer AND a distinct defendant lawyer, so the
+        // group must hold at least TWO lawyers — the old "2 lawyers OR 2 citizens"
+        // rule let a case be filed with a single lawyer (JG-032).
+        if ($lawyersCount < 2) {
             throw ValidationException::withMessages([
-                __('At least 2 lawyers or 2 citizens are required in the group to create a legal case')
+                __('At least 2 lawyers are required in the group to create a legal case')
             ]);
         }
     }

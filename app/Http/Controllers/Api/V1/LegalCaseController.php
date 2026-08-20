@@ -120,6 +120,7 @@ class LegalCaseController extends Controller
             'judgments',
             'finalJudgment',
             'firstInstanceJudgment',
+            'hearings',
         ];
     }
 }

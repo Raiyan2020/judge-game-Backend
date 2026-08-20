@@ -105,9 +105,8 @@ class LegalCaseRepository extends BaseRepository
                 $query->whereHas('participants', $participated);
             });
 
-        return [
-            // The app reads `participated_cases`; the old resource default
-            // spelled it `participated_judges` and nothing ever set either.
+        // Legacy 4 fields — kept so an OLD app build still parses something.
+        $legacy = [
             'participated_cases' => $this->model->newQuery()
                 ->whereHas('participants', $participated)
                 ->count(),
@@ -118,6 +117,71 @@ class LegalCaseRepository extends BaseRepository
             'acquittal_judgments' => (clone $judgmentQuery)
                 ->where('judgment_type', LegalCaseJudgmentType::ACQUITTAL->value)->count(),
         ];
+
+        // Role-specific tile set (JG-008/JG-017): the app renders whatever tiles
+        // arrive, so each role shows the counters that matter to it. `key` is an
+        // l10n key the app resolves.
+        return array_merge($legacy, [
+            'tiles' => $this->roleTiles($userId, $groupRole, $caseRoles),
+        ]);
+    }
+
+    /**
+     * The ordered, role-appropriate statistic tiles for a user.
+     * @return array<int, array{key:string, value:int}>
+     */
+    private function roleTiles(int $userId, string $groupRole, array $caseRoles): array
+    {
+        // Cases the user is a party to under this role.
+        $asRole = fn ($caseRole) => function ($q) use ($userId, $caseRole) {
+            $q->where('user_id', $userId)->where('role', $caseRole);
+        };
+        $countAs = fn ($caseRole) => $this->model->newQuery()
+            ->whereHas('participants', $asRole($caseRole))->count();
+
+        // Cases (under any of this role's case-roles) the user WON / lost.
+        $participated = function ($q) use ($userId, $caseRoles) {
+            $q->where('user_id', $userId)->whereIn('role', $caseRoles);
+        };
+        $wins = $this->model->newQuery()
+            ->whereHas('participants', $participated)
+            ->where('winner_id', $userId)->count();
+        $decided = $this->model->newQuery()
+            ->whereHas('participants', $participated)
+            ->whereNotNull('winner_id')->count();
+        $losses = max(0, $decided - $wins);
+        $opinions = \App\Models\LegalCaseOpinion::where('user_id', $userId)->count();
+
+        return match ($groupRole) {
+            'citizen' => [
+                ['key' => 'ranks_stats_cases_filed', 'value' => $countAs(CaseRole::PLAINTIFF->value)],
+                ['key' => 'ranks_stats_cases_against', 'value' => $countAs(CaseRole::DEFENDANT->value)],
+                ['key' => 'ranks_stats_wins', 'value' => $wins],
+                ['key' => 'ranks_stats_losses', 'value' => $losses],
+            ],
+            'lawyer' => [
+                ['key' => 'ranks_stats_cases_represented', 'value' => (int) $this->model->newQuery()
+                    ->whereHas('participants', $participated)->count()],
+                ['key' => 'ranks_stats_wins', 'value' => $wins],
+                ['key' => 'ranks_stats_losses', 'value' => $losses],
+                ['key' => 'ranks_stats_opinions', 'value' => $opinions],
+            ],
+            'judge' => [
+                ['key' => 'ranks_stats_cases_judged', 'value' => $countAs(CaseRole::JUDGE->value)],
+                ['key' => 'ranks_stats_first_instance', 'value' => LegalCaseJudgment::where('judged_by', $userId)
+                    ->where('stage', LegalCaseJudgmentStage::FIRST_INSTANCE->value)->count()],
+                ['key' => 'ranks_stats_appeal', 'value' => LegalCaseJudgment::where('judged_by', $userId)
+                    ->where('stage', LegalCaseJudgmentStage::APPEAL->value)->count()],
+                ['key' => 'ranks_stats_closed', 'value' => $this->model->newQuery()
+                    ->whereHas('participants', $asRole(CaseRole::JUDGE->value))
+                    ->where('status', LegalCaseStatus::CLOSED->value)->count()],
+            ],
+            'consultant' => [
+                ['key' => 'ranks_stats_consultations', 'value' => $countAs(CaseRole::CONSULTANT->value)],
+                ['key' => 'ranks_stats_opinions', 'value' => $opinions],
+            ],
+            default => [],
+        };
     }
 
     public function getUserGroupStatistics(int $userId, int $groupId): array
@@ -164,6 +228,75 @@ class LegalCaseRepository extends BaseRepository
             'first_instance_judgments' => (clone $judgmentQuery)->where('stage', LegalCaseJudgmentStage::FIRST_INSTANCE->value)->count(),
             'appeal_judgments' => (clone $judgmentQuery)->where('stage', LegalCaseJudgmentStage::APPEAL->value)->count(),
             'acquittal_judgments' => (clone $judgmentQuery)->where('judgment_type', LegalCaseJudgmentType::ACQUITTAL->value)->count(),
+            // Role-specific tiles scoped to THIS group (JG-017), so the member
+            // card shows the counters that fit their role, not one generic set.
+            'tiles' => $this->groupRoleTiles($userId, $groupId),
         ];
+    }
+
+    /**
+     * Group-scoped, role-appropriate tiles for a member's statistics card.
+     * @return array<int, array{key:string, value:int}>
+     */
+    private function groupRoleTiles(int $userId, int $groupId): array
+    {
+        $role = \DB::table('group_user')
+            ->where('group_id', $groupId)->where('user_id', $userId)
+            ->value('role');
+        // The owner is always the judge, whatever the stored role says.
+        $ownerId = \App\Models\Group::whereKey($groupId)->value('user_id');
+        if ((int) $ownerId === $userId) {
+            $role = 'judge';
+        }
+
+        $inGroupAs = fn ($caseRole) => $this->model->newQuery()
+            ->where('group_id', $groupId)
+            ->whereHas('participants', function ($q) use ($userId, $caseRole) {
+                $q->where('user_id', $userId)->where('role', $caseRole);
+            })->count();
+
+        $wins = $this->model->newQuery()->where('group_id', $groupId)
+            ->whereHas('participants', fn ($q) => $q->where('user_id', $userId))
+            ->where('winner_id', $userId)->count();
+        $decided = $this->model->newQuery()->where('group_id', $groupId)
+            ->whereHas('participants', fn ($q) => $q->where('user_id', $userId))
+            ->whereNotNull('winner_id')->count();
+        $losses = max(0, $decided - $wins);
+        $opinions = \App\Models\LegalCaseOpinion::where('user_id', $userId)
+            ->whereHas('legalCase', fn ($q) => $q->where('group_id', $groupId))
+            ->count();
+
+        return match ($role) {
+            'citizen' => [
+                ['key' => 'ranks_stats_cases_filed', 'value' => $inGroupAs(CaseRole::PLAINTIFF->value)],
+                ['key' => 'ranks_stats_cases_against', 'value' => $inGroupAs(CaseRole::DEFENDANT->value)],
+                ['key' => 'ranks_stats_wins', 'value' => $wins],
+                ['key' => 'ranks_stats_losses', 'value' => $losses],
+            ],
+            'lawyer' => [
+                ['key' => 'ranks_stats_cases_represented', 'value' => $inGroupAs(CaseRole::PLAINTIFF_LAWYER->value) + $inGroupAs(CaseRole::DEFENDANT_LAWYER->value)],
+                ['key' => 'ranks_stats_wins', 'value' => $wins],
+                ['key' => 'ranks_stats_losses', 'value' => $losses],
+                ['key' => 'ranks_stats_opinions', 'value' => $opinions],
+            ],
+            'judge' => [
+                ['key' => 'ranks_stats_cases_judged', 'value' => $inGroupAs(CaseRole::JUDGE->value)],
+                ['key' => 'ranks_stats_first_instance', 'value' => LegalCaseJudgment::where('judged_by', $userId)
+                    ->whereHas('legalCase', fn ($q) => $q->where('group_id', $groupId))
+                    ->where('stage', LegalCaseJudgmentStage::FIRST_INSTANCE->value)->count()],
+                ['key' => 'ranks_stats_appeal', 'value' => LegalCaseJudgment::where('judged_by', $userId)
+                    ->whereHas('legalCase', fn ($q) => $q->where('group_id', $groupId))
+                    ->where('stage', LegalCaseJudgmentStage::APPEAL->value)->count()],
+                ['key' => 'ranks_stats_closed', 'value' => $this->model->newQuery()->where('group_id', $groupId)
+                    ->whereHas('participants', function ($q) use ($userId) {
+                        $q->where('user_id', $userId)->where('role', CaseRole::JUDGE->value);
+                    })->where('status', LegalCaseStatus::CLOSED->value)->count()],
+            ],
+            'consultant' => [
+                ['key' => 'ranks_stats_consultations', 'value' => $inGroupAs(CaseRole::CONSULTANT->value)],
+                ['key' => 'ranks_stats_opinions', 'value' => $opinions],
+            ],
+            default => [],
+        };
     }
 }

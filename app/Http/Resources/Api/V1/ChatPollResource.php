@@ -12,8 +12,16 @@ class ChatPollResource extends JsonResource
         return [
             'id' => $this->id,
             'chat_message_id' => $this->chat_message_id,
+            // create_law | update_law | delete_law | ads — the app captions the
+            // card with the operation (JG-019).
             'type' => $this->type,
             'data' => $this->data,
+            // The law text BEFORE an edit/delete, so the card can show
+            // before → after (data.description is the "after"). Null for a
+            // create/ads poll (JG-018/JG-019).
+            'current_law' => $this->group_law_id
+                ? optional($this->groupLaw)->description
+                : null,
             // The option the current user voted for (null when they haven't) so
             // the app's checkmark survives a reload.
             'my_vote_option_id' => $this->relationLoaded('options')

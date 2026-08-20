@@ -72,6 +72,12 @@ class RoomService
                 'en' => 'You have been invited to join room ' . $room->name,
             ],
             'type' => 'call',
+            // A private room's join requires the (hashed) password, so an invitee
+            // could never enter without it. Deliver the plaintext in the in-app
+            // notification data only — FcmChannel forwards just title/body/type/id
+            // to the push, so it is NOT exposed on a lock-screen push or in system
+            // logs. Null for a room created without one.
+            'room_password' => $password,
         ];
 
         Notification::send($notifiables, new NewCallNotification($data));

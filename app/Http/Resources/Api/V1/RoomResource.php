@@ -25,6 +25,14 @@ class RoomResource extends JsonResource
             'type' => $this->type,
             'type_text' => __($this->type),
             'admin_id' => $this->user_id,
+            // Host/creator name, resolved from the owner relationship so the
+            // rooms list can render "بواسطة: <name>" even when the admin is not
+            // currently in `users`. Falls back to the is_admin pivot user.
+            'admin_name' => $this->relationLoaded('admin') && $this->admin
+                ? $this->admin->name
+                : ($this->relationLoaded('users')
+                    ? optional($this->users->firstWhere('pivot.is_admin', true))->name
+                    : null),
             'is_joined' => (bool) $authUser,
 
             'is_muted' => $authUser

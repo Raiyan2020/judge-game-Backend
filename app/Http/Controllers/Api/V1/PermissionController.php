@@ -47,6 +47,35 @@ class PermissionController extends Controller
     }
 
     /**
+     * The signed-in member's OWN effective permission keys in a group. Unlike
+     * [index] this is member-callable (any accepted member may read their own
+     * grants) so the app can reveal the action entry points they're allowed to
+     * use — the owner gets every key.
+     */
+    public function mine(Request $request)
+    {
+        $groupId = $request->group_id;
+
+        $group = Group::find($groupId);
+
+        // A non-member (or unknown group) simply holds nothing here — never leak
+        // another group's matrix, and never error the group screens that call it.
+        $isMember = $group && (
+            (int) $group->user_id === (int) auth()->id()
+            || $group->users()->where('user_id', auth()->id())->exists()
+        );
+
+        if (! $isMember) {
+            return \responder::success([]);
+        }
+
+        $keys = app(\App\Services\GroupPermissionService::class)
+            ->keysForUser($group, (int) auth()->id());
+
+        return \responder::success(array_values($keys));
+    }
+
+    /**
      * Guard: abort unless the authenticated user owns the group. Thrown as a
      * validation message so the app surfaces it through the standard first-error
      * path.

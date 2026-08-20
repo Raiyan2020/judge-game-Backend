@@ -5,7 +5,7 @@
                 title="{{ __('title') }}"
                 name="title"
                 size="12"
-                :item="isset($roleTitle) ? $roleTitle->getTranslations('title') : null"
+                :item="isset($roleTitle) ? $roleTitle : null"
             />
             <x-number
                 title="{{ __('tier') }}"

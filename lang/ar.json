@@ -329,7 +329,5 @@
     "required count max exceeded": "يجب ألا يتجاوز :attribute الرقم :max.",
     "banner type": "نوع البانر",
     "home banner": "بانر الرئيسية",
-    "news banner": "بانر الأخبار",
-    "home banners": "بانرات الرئيسية",
-    "news banners": "بانرات الأخبار"
+    "news banner": "بانر الأخبار"
 }

@@ -46,21 +46,10 @@
                     <span class="menu-title">{{ __('users') }}</span>
                 </a>
             </li>
-            @php
-                // Both entries hit the same banners page; the query param picks the
-                // placement so the news screen gets its own manageable list.
-                $bannersType = request()->is('dashboard/banners*') ? request('type') : null;
-            @endphp
-            <li class="nav-item {{ request()->is('dashboard/banners*') && $bannersType !== \App\Enums\BannerType::NEWS->value ? 'active' : '' }}">
-                <a href="{{ route('admin.banners.index', ['type' => \App\Enums\BannerType::HOME->value]) }}">
+            <li class="nav-item {{ request()->is('dashboard/banners*') ? 'active' : '' }}">
+                <a href="{{ route('admin.banners.index') }}">
                     <i class="feather icon-image"></i>
-                    <span class="menu-title">{{ __('home banners') }}</span>
-                </a>
-            </li>
-            <li class="nav-item {{ $bannersType === \App\Enums\BannerType::NEWS->value ? 'active' : '' }}">
-                <a href="{{ route('admin.banners.index', ['type' => \App\Enums\BannerType::NEWS->value]) }}">
-                    <i class="feather icon-image"></i>
-                    <span class="menu-title">{{ __('news banners') }}</span>
+                    <span class="menu-title">{{ __('banners') }}</span>
                 </a>
             </li>
             <li class="nav-item {{ request()->is('dashboard/countries*') ? 'active' : '' }}">

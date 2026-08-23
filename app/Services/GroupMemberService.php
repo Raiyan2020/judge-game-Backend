@@ -259,6 +259,23 @@ class GroupMemberService
         // Remove user from group
         $group->users()->detach($userId);
 
+        // Tell the removed user they were kicked (bell + FCM), so the group can
+        // disappear from their "my groups" and they know why — JG-024. Fail-soft.
+        try {
+            $member->notify(new \App\Notifications\GroupEventNotification([
+                'type' => 'group_removed',
+                'group_id' => $group->id,
+                'model_id' => $group->id,
+                'title' => ['ar' => 'إخراج من مجموعة', 'en' => 'Removed from group'],
+                'body' => [
+                    'ar' => 'تم إخراجك من مجموعة ' . $group->name,
+                    'en' => 'You have been removed from ' . $group->name,
+                ],
+            ]));
+        } catch (\Throwable $e) {
+            \Log::warning('Kick notification failed: ' . $e->getMessage());
+        }
+
         return true;
     }
 
@@ -320,20 +337,23 @@ class GroupMemberService
     {
         if($newRole == GroupRole::LAWYER->value){
             $permission = 'assign_lawyers';
-          
+
         }
         else if($newRole == GroupRole::CONSULTANT->value){
             $permission = 'assign_consultants';
         }else{
             $permission = 'assign_citizens';
         }
-        if(!$this->permissionService->hasPermission(
-            auth()->id(),
-            $group,
-            $permission
-        )) {
+        // The general "set persona" grant (تحديد الشخصية) is an ALTERNATIVE to
+        // the per-role assign_* grant — a member holding it manages the whole
+        // character-distribution screen. Additive: it never removes the access
+        // the per-role grants already give (JG-025 — set_persona was inert).
+        $authId = auth()->id();
+        if(!$this->permissionService->hasPermission($authId, $group, $permission)
+            && !$this->permissionService->hasPermission($authId, $group, 'set_persona')
+        ) {
             throw ValidationException::withMessages(['You are not authorized to change member roles in the group.']);
-       
+
      }
     }
 

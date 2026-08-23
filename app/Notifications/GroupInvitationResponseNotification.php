@@ -24,7 +24,9 @@ class GroupInvitationResponseNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['database', 'broadcast'];
+        // Push the accept/reject result too (FcmChannel reads toArray's ar/en
+        // title+body) — it previously reached only the in-app bell.
+        return ['database', 'broadcast', \App\Notifications\Channels\FcmChannel::class];
     }
 
     public function toArray(object $notifiable): array

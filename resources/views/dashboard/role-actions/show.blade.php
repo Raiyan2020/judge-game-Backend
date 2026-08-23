@@ -7,16 +7,8 @@
         $earnedActions = $role === 'citizen'
             ? $actions->reject(fn ($action) => $action->isCitizenAgainstAction())->values()
             : $actions;
-        $againstActions = $role === 'citizen'
-            ? $actions->filter(fn ($action) => $action->isCitizenAgainstAction())->values()
-            : collect();
 
         $earnedRows = $earnedActions->map(fn ($action) => [
-            'label' => $action->localizedTitle(),
-            'value' => (int) $action->points,
-        ])->all();
-
-        $againstRows = $againstActions->map(fn ($action) => [
             'label' => $action->localizedTitle(),
             'value' => (int) $action->points,
         ])->all();
@@ -27,13 +19,6 @@
             $sections[] = [
                 'title' => $role === 'citizen' ? __('citizen earned points') : __('points'),
                 'rows' => $earnedRows,
-            ];
-        }
-
-        if ($againstRows) {
-            $sections[] = [
-                'title' => __('citizen against points'),
-                'rows' => $againstRows,
             ];
         }
     @endphp

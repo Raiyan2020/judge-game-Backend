@@ -95,7 +95,11 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::apiResource('group-laws', GroupLawController::class)->only(['store', 'update', 'destroy']);
         Route::get('group-laws/{group}', [GroupLawController::class, 'index'])
             ->middleware('groupMember');
-        Route::get('groups/{group}/messages', [MessageController::class, 'getGroupMessages']);
+        // Members-only, like every other group read — without this any signed-in
+        // user could read any group's chat by iterating the id, and a kicked
+        // member kept full access (JG-024).
+        Route::get('groups/{group}/messages', [MessageController::class, 'getGroupMessages'])
+            ->middleware('groupMember');
         Route::get('groups/{group}/members-by-role', [GroupMemberController::class, 'getMemberByRole'])
             ->middleware('groupMember');
         Route::get('private-messages', [MessageController::class, 'getPrivateMessages']);
@@ -119,6 +123,10 @@ Route::group(['middleware' => 'setLocale'], function () {
         Route::post('coupons', [CouponController::class, 'store']);
         Route::get('permissions', [PermissionController::class, 'index']);
         Route::post('permissions', [PermissionController::class, 'togglePermission']);
+        // The signed-in member's OWN effective permission keys in a group (owner
+        // holds all). Member-callable — unlike `index`, which is owner-only — so
+        // the app can reveal the action entry points a granted member may use.
+        Route::get('my-permissions', [PermissionController::class, 'mine']);
         Route::get('rooms/{room}/token', [AgoraController::class, 'generateToken']);
         Route::get('rooms', [RoomController::class, 'index']);
         Route::post('rooms', [RoomController::class, 'store']);
@@ -170,4 +178,6 @@ Route::group(['middleware' => 'setLocale'], function () {
     // The leaderboard detail sheet. Public like the board it belongs to, and
     // registered AFTER the index so the literal path wins over the wildcard.
     Route::get('users-ranking/{user}', [UserRankController::class, 'show']);
+    // The "best groups" board (JG-010).
+    Route::get('groups-ranking', [GroupController::class, 'bestGroups']);
 });

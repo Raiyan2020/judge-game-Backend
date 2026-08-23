@@ -23,7 +23,10 @@ class GroupInvitationNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['database', 'broadcast'];
+        // FcmChannel pushes this to the invitee's device (it reads the ar/en
+        // title+body from toArray). Without it the invite reached only the
+        // in-app bell, never a push — the other notifications already push.
+        return ['database', 'broadcast', \App\Notifications\Channels\FcmChannel::class];
     }
 
     public function toArray(object $notifiable): array

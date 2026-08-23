@@ -37,6 +37,10 @@ class PointsService
     // Consultant.
     private const CONSULTANT_PARTICIPATE = 1;
 
+    // Citizen (plaintiff) — filing a lawsuit is the citizen's participation act,
+    // mirroring the consultant's participation tier.
+    private const CITIZEN_FILE_CASE = 1;
+
     /**
      * Insert one point row for [$userId] under [$role] ('judge'|'lawyer'|
      * 'consultant'|'citizen' — the values the `points` view groups by). No-op if
@@ -115,5 +119,15 @@ class PointsService
     public function onConsultantParticipation(LegalCase $case, int $consultantUserId): void
     {
         $this->award($consultantUserId, 'consultant', self::CONSULTANT_PARTICIPATE, "consultant_participate:{$case->id}:{$consultantUserId}");
+    }
+
+    /**
+     * The plaintiff filed the lawsuit. Awarded once per case (idempotent), so
+     * the filer's profile reflects citizen points the moment the case is filed
+     * — the "reward" the post-filing achievement popup promises.
+     */
+    public function onCaseFiled(LegalCase $case, int $filerUserId): void
+    {
+        $this->award($filerUserId, 'citizen', self::CITIZEN_FILE_CASE, "file_case:{$case->id}:{$filerUserId}");
     }
 }

@@ -87,6 +87,14 @@ class RoleAchievementService
                             $action =
                                 $requirement->action;
 
+                            // Guard an orphaned requirement (role_action_id with
+                            // no matching role_actions row — e.g. a partially
+                            // seeded DB). Reading $action->key on null 500'd the
+                            // whole achievements screen; skip the row instead.
+                            if (! $action) {
+                                return null;
+                            }
+
                             $current =
                                 $actionCounts[
                                     $action->key
@@ -128,7 +136,10 @@ class RoleAchievementService
                                         : 100,
                             ];
                         }
-                    );
+                    )
+                    // Drop the orphaned requirements guarded above.
+                    ->filter()
+                    ->values();
 
                 $usage = app(GroupUserTitleService::class)->getUsage(
                     $group,

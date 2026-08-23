@@ -40,7 +40,9 @@ class StoreLegalCaseOpinionRequest extends FormRequest
             'images' => 'nullable|array',
             'images.*' => 'image|max:10240',
             'videos' => 'nullable|array',
-            'videos.*' => 'mimes:mp4,mov,avi|max:10240',
+            // Real-MIME validation so camera clips (quicktime/3gpp) pass; 50MB
+            // cap for camera video size (JG-030).
+            'videos.*' => 'mimetypes:video/mp4,video/quicktime,video/x-msvideo,video/3gpp,video/x-matroska|max:51200',
             'audios' => 'nullable|array',
             'audios.*' => 'mimes:mp3,wav,m4a|max:10240',
         ];

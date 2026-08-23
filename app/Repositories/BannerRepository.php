@@ -2,6 +2,7 @@
 
 namespace App\Repositories;
 
+use App\Enums\BannerType;
 use App\Models\Banner;
 
 class BannerRepository extends BaseRepository
@@ -15,8 +16,13 @@ class BannerRepository extends BaseRepository
         parent::__construct($model);
     }
 
-    public function index()
+    /**
+     * Active banners for one placement. Defaults to HOME so existing callers
+     * (GET /banners, GET /home) keep the behaviour they had before banners
+     * gained a type.
+     */
+    public function index(BannerType $type = BannerType::HOME)
     {
-       return $this->model->active()->latest()->get();
+       return $this->model->active()->ofType($type)->latest()->get();
     }
 }

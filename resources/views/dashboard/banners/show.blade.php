@@ -8,6 +8,7 @@
             [
                 'title' => __('basic information'),
                 'rows' => [
+                    ['label' => __('banner type'), 'value' => $banner->type?->label() ?: '-'],
                     ['label' => __('title') . ' (' . __('in Arabic') . ')', 'value' => $banner->getTranslation('title', 'ar')],
                     ['label' => __('title') . ' (' . __('in English') . ')', 'value' => $banner->getTranslation('title', 'en')],
                     ['label' => __('link url'), 'value' => $banner->url ?: '-', 'full' => true],

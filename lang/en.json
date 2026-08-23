@@ -186,5 +186,11 @@
     "select role to load actions": "Select a role to display actions and required counts.",
     "role title actions required": "Please select a role and configure at least one action.",
     "role title tier unique": "This :attribute already exists for the selected role.",
-    "required count max exceeded": "The :attribute must not exceed :max."
+    "required count max exceeded": "The :attribute must not exceed :max.",
+    "all": "All",
+    "banner type": "Banner type",
+    "home banner": "Home banner",
+    "news banner": "News banner",
+    "home banners": "Home banners",
+    "news banners": "News banners"
 }

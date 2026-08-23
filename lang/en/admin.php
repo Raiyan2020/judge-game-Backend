@@ -13,6 +13,7 @@ return [
         'title.ar' => 'Title in Arabic',
         'title.en' => 'Title in English',
         'url' => 'Link URL',
+        'type' => 'Type',
         'image' => 'Image',
         'name.ar' => 'Name in Arabic',
         'name.en' => 'Name in English',

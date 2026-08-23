@@ -16,6 +16,9 @@ class BannerResource extends JsonResource
     {
         return [
           'id'=>$this->id,
+          // Placement of the banner: 'home' or 'news'. Additive field — existing
+          // clients that ignore it are unaffected.
+          'type'=>$this->type?->value,
           // `title` is a Spatie translatable; a row stored as a plain (non-JSON)
           // string can throw on read and 500 the whole /banners list. rescue()
           // degrades that one field to '' instead so the banners still load.

@@ -1,5 +1,9 @@
 @extends('dashboard.layout.main')
-@section('title',__('banners'))
+@php
+    $activeType = \App\Enums\BannerType::tryFrom((string) request('type'));
+    $pageTitle = $activeType ? $activeType->label() : __('banners');
+@endphp
+@section('title', $pageTitle)
 @section('content')
 
     <div class="content-body">
@@ -9,12 +13,25 @@
                 <div class="col-12">
                     <div class="card">
                         <div class="card-header">
-                            <h4 class="card-title">{{  __('banners') }}</h4>
+                            <h4 class="card-title">{{ $pageTitle }}</h4>
                         </div>
                         <div class="card-content">
                             <div class="card-body card-dashboard">
                               
-                                <a href="{{ route('admin.banners.create') }}"
+                                <div class="btn-group mb-2 mr-1" role="group">
+                                    <a href="{{ route('admin.banners.index') }}"
+                                        class="btn btn-{{ $activeType ? 'outline-primary' : 'primary' }} waves-effect waves-light">
+                                        {{ __('all') }}
+                                    </a>
+                                    @foreach (\App\Enums\BannerType::cases() as $bannerType)
+                                        <a href="{{ route('admin.banners.index', ['type' => $bannerType->value]) }}"
+                                            class="btn btn-{{ $activeType === $bannerType ? 'primary' : 'outline-primary' }} waves-effect waves-light">
+                                            {{ $bannerType->label() }}
+                                        </a>
+                                    @endforeach
+                                </div>
+
+                                <a href="{{ route('admin.banners.create', $activeType ? ['type' => $activeType->value] : []) }}"
                                     class="btn btn-primary mb-2 waves-effect waves-light">
                                     <i class="fas fa-plus"></i>&nbsp; {{ __('add new') }} 
                                 </a>

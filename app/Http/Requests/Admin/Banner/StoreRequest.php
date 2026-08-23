@@ -2,9 +2,10 @@
 
 namespace App\Http\Requests\Admin\Banner;
 
-use App\Enum\BannerTypeEnum;
+use App\Enums\BannerType;
 use App\Http\Requests\Admin\Concerns\UsesAdminAttributes;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreRequest extends FormRequest
 {
@@ -25,6 +26,7 @@ class StoreRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'type' => ['required', Rule::enum(BannerType::class)],
             'title' => 'required|array',
             'title.ar' => 'required|string|min:1|max:255',
             'title.en' => 'required|string|min:1|max:255',

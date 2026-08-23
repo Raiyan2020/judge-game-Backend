@@ -2,6 +2,7 @@
 
 namespace App\DataTables;
 
+use App\Enums\BannerType;
 use App\Models\Banner;
 use Illuminate\Database\Eloquent\Builder as QueryBuilder;
 use Yajra\DataTables\EloquentDataTable;
@@ -37,6 +38,23 @@ class BannerDataTable extends DataTable
          ->addColumn('title', function ($banner) {
             return $banner->title;
          })
+        ->editColumn('type', function ($banner) {
+            return $banner->type?->label() ?? '-';
+        })
+        ->filterColumn('type', function ($query, $keyword) {
+            // Let admins search by the translated label ("news banner") as well
+            // as by the raw stored value ("news").
+            $needle = mb_strtolower(trim($keyword));
+
+            $values = collect(BannerType::cases())
+                ->filter(fn (BannerType $type) => str_contains(mb_strtolower($type->label()), $needle)
+                    || str_contains($type->value, $needle))
+                ->map(fn (BannerType $type) => $type->value)
+                ->values()
+                ->all();
+
+            $query->whereIn('banners.type', $values ?: ['']);
+        })
         ->addColumn('status', function ($banner) {
             return view('dashboard.banners.status', ['banner' => $banner]);
         })
@@ -50,7 +68,17 @@ class BannerDataTable extends DataTable
      */
     public function query(Banner $model): QueryBuilder
     {
-        return $model->newQuery()->latest();
+        $query = $model->newQuery()->latest();
+
+        // Placement tabs on the index page (?type=home / ?type=news). No param
+        // means "all", which is what the page showed before types existed.
+        $type = BannerType::tryFrom((string) request('type'));
+
+        if ($type) {
+            $query->ofType($type);
+        }
+
+        return $query;
     }
 
     /**
@@ -97,6 +125,7 @@ class BannerDataTable extends DataTable
         return [
             Column::computed('DT_RowIndex')->title('#'),
             Column::computed('title')->title(__('title'))->searchable(),
+            Column::make('type')->title(__('banner type')),
             Column::computed('image')->title(__('image')),
             Column::computed('status')->title(__('status')),
             Column::computed('action')->title(__('actions')),

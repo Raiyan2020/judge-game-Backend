@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\BannerType;
 use App\Repositories\BannerRepository;
 
 class BannerService {
@@ -11,8 +12,8 @@ class BannerService {
     {
     }
 
-    public function index(){
-        return $this->repo->index();
+    public function index(BannerType $type = BannerType::HOME){
+        return $this->repo->index($type);
     }
    
 

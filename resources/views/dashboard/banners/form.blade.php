@@ -1,6 +1,13 @@
 <div class="admin-form-page">
     <div class="row match-height">
         <x-admin-form-section :title="__('basic information')" icon="icon-type" col="col-lg-6">
+            <x-select
+                name="type"
+                :items="\App\Enums\BannerType::options()"
+                title="{{ __('banner type') }}"
+                size="12"
+                :selected="[isset($banner) ? $banner->type?->value : request('type', \App\Enums\BannerType::HOME->value)]"
+            />
             <x-translatable title="{{ __('title') }}" name="title" size="12" :item="isset($banner) ? $banner : null"></x-translatable>
             <x-text
                 title="{{ __('link url') }}"

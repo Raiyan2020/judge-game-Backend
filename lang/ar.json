@@ -321,5 +321,10 @@
     "select role to load actions": "اختر الدور لعرض العمليات والعدد المطلوب.",
     "role title actions required": "يرجى اختيار الدور وتحديد عملية واحدة على الأقل.",
     "role title tier unique": ":attribute مستخدم بالفعل لهذا الدور.",
-    "required count max exceeded": "يجب ألا يتجاوز :attribute الرقم :max."
+    "required count max exceeded": "يجب ألا يتجاوز :attribute الرقم :max.",
+    "banner type": "نوع البانر",
+    "home banner": "بانر الرئيسية",
+    "news banner": "بانر الأخبار",
+    "home banners": "بانرات الرئيسية",
+    "news banners": "بانرات الأخبار"
 }

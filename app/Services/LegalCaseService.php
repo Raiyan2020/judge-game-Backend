@@ -15,13 +15,16 @@ use Illuminate\Validation\ValidationException;
 
 class LegalCaseService
 {
-    public function __construct(protected LegalCaseRepository $repo, protected GroupRepository $groupRepo, protected GroupPermissionService $groupPermissionService, protected GroupEventService $events, protected PointsService $points) {}
+    public function __construct(protected LegalCaseRepository $repo, protected GroupRepository $groupRepo, protected GroupPermissionService $groupPermissionService, protected GroupEventService $events, protected PointsService $points, protected LegalCaseJudgmentService $judgmentService) {}
 
     public function index($filters, $groupId)
     {
         // Lazily settle any full-distance cases before listing, so `execution`
-        // cases that finished their enforcement window show as `closed`.
+        // cases that finished their enforcement window show as `closed`, and
+        // un-appealed first-instance verdicts past the 24h window read as upheld
+        // and closed (BUG9).
         $this->repo->closeExpiredExecutionCases($groupId);
+        $this->judgmentService->upholdExpiredFirstInstanceCases($groupId);
         $filters['group_id'] = $groupId;
         return $this->repo->index($filters);
     }
@@ -32,10 +35,16 @@ class LegalCaseService
      */
     public function settleIfExecutionExpired($legalCase): void
     {
-        if ($legalCase->status !== \App\Enums\LegalCaseStatus::EXECUTION->value) {
-            return;
+        // Auto-uphold an un-appealed first-instance verdict past its 24h window
+        // (BUG9), scoped to this case's group, so an `ongoing` case opened after
+        // the window reads as upheld and closed.
+        $this->judgmentService->upholdExpiredFirstInstanceCases($legalCase->group_id);
+
+        // A case that finished its execution window should read as `closed`.
+        if ($legalCase->status === \App\Enums\LegalCaseStatus::EXECUTION->value) {
+            $this->repo->closeExpiredExecutionCases($legalCase->group_id);
         }
-        $this->repo->closeExpiredExecutionCases($legalCase->group_id);
+
         $legalCase->refresh();
     }
 

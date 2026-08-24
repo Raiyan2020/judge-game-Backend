@@ -78,6 +78,37 @@ class LegalCaseRepository extends BaseRepository
     }
 
     /**
+     * The auto-uphold window (BUG9, product decision): a first-instance verdict
+     * left un-appealed for this long is upheld automatically. Sits beside the
+     * 7-day execution window above so both time-based settlement rules live in
+     * one place.
+     */
+    public const APPEAL_WINDOW_HOURS = 24;
+
+    /**
+     * Cases whose first-instance verdict has stood past the appeal window with
+     * NO appeal — i.e. still `ongoing` (requesting an appeal flips the status to
+     * `appeal`, so an ongoing case by definition has no appeal) and carrying a
+     * first-instance judgment created at least APPEAL_WINDOW_HOURS ago.
+     *
+     * Returns the models (not a bulk UPDATE) because upholding must mirror
+     * `acceptJudgment` per case — winner_id + is_final + points — which a single
+     * UPDATE cannot express. Only convictions reach here: acquittal/dismissed
+     * first judgments close immediately as final and never sit in `ongoing`.
+     */
+    public function expiredUnappealedFirstInstanceCases($groupId = null)
+    {
+        return $this->model->query()
+            ->where('status', LegalCaseStatus::ONGOING->value)
+            ->when($groupId, fn ($q) => $q->where('group_id', $groupId))
+            ->whereHas('firstInstanceJudgment', function ($query) {
+                $query->where('created_at', '<=', now()->subHours(self::APPEAL_WINDOW_HOURS));
+            })
+            ->with(['plaintiff', 'defendant', 'plaintiffLawyer', 'firstInstanceJudgment', 'group'])
+            ->get();
+    }
+
+    /**
      * A user's case record ACROSS every group, scoped to one judicial role —
      * what the ranks leaderboard's detail sheet shows.
      *

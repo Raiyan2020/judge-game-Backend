@@ -39,6 +39,9 @@ return Application::configure(basePath: dirname(__DIR__))
     // ->withSchedule(function (Schedule $schedule) {
     //     $schedule->job(new \App\Jobs\CloseExpiredExecutionCases)->daily();
     //     $schedule->job(new \App\Jobs\ProcessExpiredPolls)->hourly();
+    //     // BUG9: auto-uphold un-appealed first-instance verdicts past 24h.
+    //     // Hourly so the 24h window closes promptly; lazy on-read also settles.
+    //     $schedule->job(new \App\Jobs\UpholdExpiredFirstInstanceCases)->hourly();
     // })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (AuthenticationException $e, Request $request) {

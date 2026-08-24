@@ -52,6 +52,10 @@ class LegalCaseJudgmentController extends Controller
             'judgments',
             'finalJudgment',
             'firstInstanceJudgment',
+            // Keep the hearing loaded on the post-ruling echo so
+            // `has_scheduled_hearing` stays true and the app doesn't re-enable
+            // "تحديد جلسة" after a verdict (BUG4).
+            'hearings',
         ];
     }
 }

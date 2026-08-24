@@ -338,6 +338,121 @@ class LegalCaseJudgmentService
             throw $e;
         }
     }
+    /**
+     * Auto-uphold every first-instance verdict that has stood past the appeal
+     * window with NO appeal (BUG9). Product rule: 24h after a first-instance
+     * ruling with no appeal, the verdict is UPHELD and the case CLOSES. This is
+     * the same terminal transition as a defendant lawyer ACCEPTING the ruling
+     * (`acceptJudgment`): the plaintiff side wins, the first-instance judgment
+     * becomes final, and the win points are paid.
+     *
+     * Lazy-triggered on read (like the 7-day execution close — see
+     * `LegalCaseService`), and also runnable from the scheduled
+     * `UpholdExpiredFirstInstanceCases` job. Idempotent: the case leaves
+     * `ongoing` and points are keyed by a stable reason, so re-running never
+     * double-settles.
+     *
+     * @return int number of cases upheld
+     */
+    public function upholdExpiredFirstInstanceCases($groupId = null): int
+    {
+        $cases = $this->legalCaseRepo->expiredUnappealedFirstInstanceCases($groupId);
+
+        $count = 0;
+        foreach ($cases as $legalCase) {
+            $this->upholdFirstInstanceVerdict($legalCase);
+            $count++;
+        }
+
+        return $count;
+    }
+
+    /**
+     * Settle ONE case by upholding its first-instance verdict — a faithful
+     * mirror of `acceptJudgment`'s state transition (status → closed, winner_id
+     * = plaintiff, first-instance judgment → final, win points paid), wrapped in
+     * its own transaction so a failure on one case can't poison the batch.
+     */
+    private function upholdFirstInstanceVerdict(LegalCase $legalCase): void
+    {
+        try {
+            DB::beginTransaction();
+
+            // Re-check under the transaction: only settle a case still ongoing
+            // (guards against a concurrent accept/appeal between query and here).
+            if ($legalCase->status !== LegalCaseStatus::ONGOING->value) {
+                DB::rollBack();
+
+                return;
+            }
+
+            // Only ongoing cases carrying a NON-final first-instance verdict
+            // reach here (acquittal/dismissed already closed as final), so the
+            // upheld verdict is a conviction → the plaintiff side wins, exactly
+            // as when the defendant lawyer accepts the ruling.
+            $legalCase->update([
+                'status' => LegalCaseStatus::CLOSED->value,
+                'winner_id' => $legalCase->plaintiff?->user_id,
+            ]);
+
+            $judgment = $legalCase->firstInstanceJudgment;
+            if ($judgment) {
+                $judgment->update(['is_final' => true]);
+            }
+
+            $this->createAutoUpholdNews($legalCase, $judgment);
+            $this->postCaseChat($legalCase, 'تم تأييد الحكم تلقائيًا بعد انتهاء مهلة الاستئناف وإغلاق قضية');
+
+            // Same points as an accepted judgment: the plaintiff side won.
+            $this->points->onJudgmentAccepted($legalCase);
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Case news + defendant notification for an automatic uphold. Kept separate
+     * from `createAcceptanceNews` so the copy is truthful ("upheld after the
+     * appeal window", not "accepted by the defendant lawyer") and so it carries
+     * no actor (system action, `auth()->id()` may be null on the scheduler).
+     */
+    private function createAutoUpholdNews(LegalCase $legalCase, $judgment): void
+    {
+        $message = [
+            'ar' => 'تم تأييد الحكم للقضية رقم ' . ($judgment?->id ?? $legalCase->id) . ' تلقائيًا بعد انتهاء مهلة الاستئناف',
+            'en' => 'The judgment for case number ' . ($judgment?->id ?? $legalCase->id) . ' was upheld automatically after the appeal window expired',
+        ];
+
+        $defendant = $legalCase->defendant;
+        if (! $defendant) {
+            return;
+        }
+
+        $this->legalCaseRepo->createCaseNews(
+            $legalCase,
+            'case_acceptance_ruling',
+            $message,
+            null,
+            $defendant->user_id
+        );
+
+        if ($defendant->user) {
+            Notification::send($defendant->user, new LegalCaseNotification($legalCase, [
+                'model_id' => $legalCase->id,
+                'title' => [
+                    'ar' => 'تأييد الحكم',
+                    'en' => 'Judgment Upheld',
+                ],
+                'body' => $message,
+                'type' => 'acceptance_ruling',
+            ]));
+        }
+    }
+
     private function ensureUserIsDefendantLawyer(LegalCase $legalCase): void
     {
         $defendantLawyer = $legalCase->defendantLawyer;

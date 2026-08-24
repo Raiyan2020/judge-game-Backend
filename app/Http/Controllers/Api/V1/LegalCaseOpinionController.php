@@ -71,6 +71,10 @@ class LegalCaseOpinionController extends Controller
             'judgments',
             'finalJudgment',
             'firstInstanceJudgment',
+            // Keep the hearing loaded on the post-opinion echo so
+            // `has_scheduled_hearing` stays true and the app doesn't re-enable
+            // "تحديد جلسة" after an opinion (BUG4).
+            'hearings',
         ];
     }
 }

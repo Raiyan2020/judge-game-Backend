@@ -33,6 +33,13 @@ class LegalCaseResource extends JsonResource
                 ? $this->hearings->where('status', 'scheduled')->isNotEmpty()
                 : false,
 
+            // The scheduled session DATE so the app can SHOW it (not just a
+            // boolean). Pulled from the same hearings relation; null when no
+            // hearing is scheduled or the relation isn't loaded.
+            'scheduled_at' => $this->relationLoaded('hearings')
+                ? optional($this->hearings->firstWhere('status', 'scheduled'))->scheduled_at?->toIso8601String()
+                : null,
+
             'group' =>  $this->relationLoaded('group') ? [
                 'id' => $this->group?->id,
                 'name' => $this->group?->name,

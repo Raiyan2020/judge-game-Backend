@@ -120,6 +120,9 @@ Route::group(['middleware' => 'setLocale'], function () {
         // The signed-in user's achievement ladder in this group (real progress).
         Route::get('groups/{group}/achievements', [\App\Http\Controllers\Api\V1\AchievementController::class, 'index'])
             ->middleware('groupMember');
+        // Persist the member's chosen active role title (اللقب) — M4a.
+        Route::post('groups/{group}/achievements/active-title', [\App\Http\Controllers\Api\V1\AchievementController::class, 'activateTitle'])
+            ->middleware('groupMember');
         Route::post('coupons', [CouponController::class, 'store']);
         Route::get('permissions', [PermissionController::class, 'index']);
         Route::post('permissions', [PermissionController::class, 'togglePermission']);

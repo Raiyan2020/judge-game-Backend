@@ -18,6 +18,13 @@ class MessageService
     {
         if ($type === 'group' && $group) {
             $this->checkMembership($group);
+
+            // Settle any poll whose 24h window elapsed BEFORE listing, so opening
+            // the chat (not just the laws screen) enacts an affirmative majority
+            // and closes it — the auto-execute stays reliable without the
+            // scheduler. Idempotent: resolveExpiredPolls only touches open,
+            // already-expired polls (M3b).
+            $this->resolveExpiredPolls($group->id);
         }
 
         $userId = auth('sanctum')->id();

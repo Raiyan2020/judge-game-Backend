@@ -27,6 +27,9 @@ class ChatPollResource extends JsonResource
             'my_vote_option_id' => $this->relationLoaded('options')
                 ? optional($this->options->first(fn ($o) => ($o->mine_count ?? 0) > 0))->id
                 : null,
+            // When the 24h vote window ends — ISO8601, null-safe — so the app can
+            // render a live countdown on the poll card (M3b).
+            'expires_at' => $this->expires_at?->toIso8601String(),
             // The poll is open only while not closed AND not past its expiry —
             // the app locks voting when this is false.
             'can_vote' => !$this->is_closed

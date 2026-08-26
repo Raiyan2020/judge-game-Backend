@@ -167,6 +167,11 @@ class RoleAchievementService
 
                     'used' => $usage['used'],
 
+                    // Whether this is the member's currently-displayed title, so
+                    // the app seeds the real active اللقب instead of guessing the
+                    // top completed rung (M4a).
+                    'is_active' => $usage['is_active'],
+
                     // "used_at" is when the title was CLAIMED (the closest date
                     // signal we store); may be null for a completed-but-unclaimed
                     // rung — the app card tolerates null.

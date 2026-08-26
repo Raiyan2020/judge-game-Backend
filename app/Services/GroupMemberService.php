@@ -92,11 +92,15 @@ class GroupMemberService
            throw ValidationException::withMessages([ __('User is already a member of the group.')]);
        }
 
-       DB::transaction(function () use ($group, $user, $data) {
+       $inviterId = auth()->id();
+       DB::transaction(function () use ($group, $user, $data, $inviterId) {
            $this->repo->attachGroupMember($group, $user, [
                'role' => $data['role'],
                'status' => 'pending',
                'title' => $data['role'],
+               // N5 — record WHO sent this invite, so accept/reject notifies the
+               // real inviter (not the group judge) and the invitee sees them.
+               'invited_by' => $inviterId,
            ]);
        });
 
@@ -131,10 +135,14 @@ class GroupMemberService
            throw ValidationException::withMessages([ __('Pending invitation not found')]);
        }
 
+       // Capture the inviter BEFORE mutating the pivot so the response notice
+       // reaches whoever actually sent the invite (owner is the fallback).
+       $inviterId = $pivot->invited_by ?? null;
+
        $this->repo->updateGroupMemberStatus($group, $user, 'accepted');
        $group->chat?->users()->attach($user->id);
 
-       $this->notifyOwnerOfResponse($group, $user, true);
+       $this->notifyOwnerOfResponse($group, $user, true, $inviterId);
 
        return $user;
    }
@@ -147,30 +155,35 @@ class GroupMemberService
            throw ValidationException::withMessages([ __('Pending invitation not found')]);
        }
 
+       // Capture the inviter BEFORE removing the pivot (removeGroupMember
+       // detaches it, so it is gone by the time we notify).
+       $inviterId = $pivot->invited_by ?? null;
+
        $this->repo->removeGroupMember($group, $user);
 
-       $this->notifyOwnerOfResponse($group, $user, false);
+       $this->notifyOwnerOfResponse($group, $user, false, $inviterId);
 
        return true;
    }
 
    /**
-    * Tell the group owner (the inviter surrogate — the pivot stores no per-invite
-    * sender) that an invitation was accepted / rejected. Fail-soft: a
-    * notification error must never fail the accept/reject itself.
+    * Tell the ACTUAL inviter (the pivot's `invited_by`) that their invitation
+    * was accepted / rejected — falling back to the group owner when the invite
+    * predates inviter tracking or the inviter is gone. Fail-soft: a notification
+    * error must never fail the accept/reject itself.
     */
-   private function notifyOwnerOfResponse(Group $group, User $responder, bool $accepted): void
+   private function notifyOwnerOfResponse(Group $group, User $responder, bool $accepted, ?int $inviterId = null): void
    {
        try {
-           $owner = $group->owner;
-           if (!$owner) {
+           $target = ($inviterId ? User::find($inviterId) : null) ?? $group->owner;
+           if (!$target) {
                return;
            }
-           $owner->notify(new \App\Notifications\GroupInvitationResponseNotification($group, $responder, $accepted));
+           $target->notify(new \App\Notifications\GroupInvitationResponseNotification($group, $responder, $accepted));
 
            $verb = $accepted ? 'قبل دعوتك للانضمام إلى ' : 'رفض دعوتك للانضمام إلى ';
            app(\App\Services\FcmService::class)->sendToToken(
-               $owner->fcm_token,
+               $target->fcm_token,
                $group->name,
                trim(($responder->name ?? '') . ' ' . $verb . $group->name),
                ['type' => $accepted ? 'group_invite_accepted' : 'group_invite_rejected', 'id' => (string) $group->id, 'related_data' => (string) $group->id],

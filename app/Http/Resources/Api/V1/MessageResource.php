@@ -25,7 +25,8 @@ class MessageResource extends JsonResource
             'type' => $this->type,
             'attachment' => $this->attachment,
             'poll' => $this->relationLoaded('poll') ? new ChatPollResource($this->poll) : null,
-            'created_at' => $this->created_at?->format('H:i a'),
+            // 12-hour clock with am/pm — 'H' (24h) + 'a' rendered "20:23 pm".
+            'created_at' => $this->created_at?->format('h:i a'),
         ];
     }
 }

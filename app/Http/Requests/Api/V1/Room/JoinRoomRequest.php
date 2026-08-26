@@ -22,8 +22,9 @@ class JoinRoomRequest extends FormRequest
     public function rules(): array
     {
         $room = $this->route('room');
+        $isOwner = auth()->id() === $room->user_id;
         return [
-            'password' => [$room->type === 'private' ? 'required' : 'nullable', 'string', 'max:255'],
+            'password' => [($room->type === 'private' && !$isOwner) ? 'required' : 'nullable', 'string', 'max:255'],
             'is_muted' => 'nullable|boolean',
            
         ];

@@ -22,6 +22,9 @@ class AchievementResource extends JsonResource
             'title' => (string) $this['title'],
             'points' => (int) ($this['reward_points'] ?? 0),
             'is_completed' => (bool) $this['completed'],
+            // The member's currently-displayed title (اللقب), persisted via
+            // POST .../achievements/active-title (M4a).
+            'is_active' => (bool) ($this['is_active'] ?? false),
             'completed_date' => $this['used_at'],
             'tasks' => collect($this['requirements'])->map(fn ($r) => [
                 'description' => (string) $r['title'],

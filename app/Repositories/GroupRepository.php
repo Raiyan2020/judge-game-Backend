@@ -55,7 +55,7 @@ class GroupRepository extends BaseRepository
         // "My Invitations" screen (accept / reject).
         return $user->groups()
             ->wherePivot('status', 'pending')
-            ->withPivot('role')
+            ->withPivot('role', 'invited_by')
             ->withCount(['users as members_count' => function ($q) {
                 $q->where('group_user.status', 'accepted');
             }])

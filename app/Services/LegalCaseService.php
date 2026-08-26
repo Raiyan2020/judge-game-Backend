@@ -357,14 +357,26 @@ class LegalCaseService
             throw ValidationException::withMessages([__('You are not authorized to perform this action')]);
         }
 
-        // Assignable while the case is still open at the first-instance stage
-        // (new or ongoing) — the defence lawyer accepts/appeals the first
-        // ruling, so late appointment at `ongoing` must stay possible; only
-        // appeal / execution / closed are too late.
-        if (! in_array($case->status, [LegalCaseStatus::NEW->value, LegalCaseStatus::ONGOING->value], true)) {
+        // Assignable while the case is still open at first instance (new /
+        // ongoing) OR under APPEAL — a convicted defendant who had no lawyer must
+        // be able to appoint one to defend the appeal (C1). Only execution /
+        // closed are too late.
+        if (! in_array(
+            $case->status,
+            [
+                LegalCaseStatus::NEW->value,
+                LegalCaseStatus::ONGOING->value,
+                LegalCaseStatus::APPEAL->value,
+            ],
+            true
+        )) {
             throw ValidationException::withMessages([__('The case is no longer open for assigning a lawyer')]);
         }
 
+        // One defence lawyer per case: if one is already assigned, block a
+        // re-assignment (in any stage, appeal included). The appeal path exists
+        // for the defendant who reached appeal WITHOUT a lawyer — so the guard
+        // permits assignment precisely when none exists yet.
         $existingLawyer = $case->participants()
             ->where('role', CaseRole::DEFENDANT_LAWYER->value)
             ->exists();

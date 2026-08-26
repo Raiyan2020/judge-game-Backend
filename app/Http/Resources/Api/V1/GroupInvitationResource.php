@@ -8,17 +8,22 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * One pending group invitation for the "My Invitations" screen. `id` is the
  * GROUP id (used to accept/reject via /groups/{id}/accept|reject). The inviter
- * is shown as the group owner (the pivot doesn't store who sent each invite).
+ * is the pivot's `invited_by` (who actually sent this invite), falling back to
+ * the group owner for invites that predate inviter tracking (N5).
  */
 class GroupInvitationResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $inviterId = $this->pivot?->invited_by;
+        $inviter = $inviterId ? \App\Models\User::find($inviterId) : null;
+
         return [
             'id' => $this->id,
             'group_name' => $this->name,
             'group_image' => $this->image,
-            'inviter_name' => $this->owner?->name ?? '',
+            'inviter_id' => $inviter?->id ?? $this->owner?->id,
+            'inviter_name' => $inviter?->name ?? $this->owner?->name ?? '',
             'role' => $this->pivot?->role,
             'members_count' => $this->members_count ?? 0,
             // The invitation "About" card renders these; omitting them made the

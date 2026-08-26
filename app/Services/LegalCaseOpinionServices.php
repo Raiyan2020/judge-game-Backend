@@ -72,6 +72,16 @@ class LegalCaseOpinionServices
             // back an already-committed opinion.
             DB::afterCommit(function () use ($legalCase, $legalCaseOpinion) {
                 $this->notifyDefendantOnNewOpinion($legalCase, $legalCaseOpinion);
+
+                // N4 — an opinion filed while the case is under APPEAL is an
+                // appeal opinion the judge must review, but
+                // notifyDefendantOnNewOpinion returns early off the NEW stage, so
+                // nobody was told. Gate on the case STATUS (not resolveStage's
+                // derived stage, which collapses every non-NEW status to APPEAL
+                // and would misfire on an ordinary ongoing-case opinion).
+                if ($legalCase->status === LegalCaseStatus::APPEAL->value) {
+                    $this->notifyJudgeOnAppealOpinion($legalCase);
+                }
             });
 
             DB::commit();
@@ -114,6 +124,29 @@ class LegalCaseOpinionServices
         ];
 
         Notification::send($defendant->user, new LegalCaseNotification($legalCase, $data));
+    }
+
+    private function notifyJudgeOnAppealOpinion($legalCase): void
+    {
+        $judge = $legalCase->judge;
+        if (! $judge || ! $judge->user) {
+            return;
+        }
+
+        $data = [
+            'model_id' => $legalCase->id,
+            'title' => [
+                'ar' => 'رأي استئناف جديد',
+                'en' => 'New appeal opinion',
+            ],
+            'body' => [
+                'ar' => 'تم تقديم رأي استئناف في القضية رقم ' . $legalCase->id,
+                'en' => 'An appeal opinion was submitted for case number ' . $legalCase->id,
+            ],
+            'type' => 'appeal_opinion',
+        ];
+
+        Notification::send($judge->user, new LegalCaseNotification($legalCase, $data));
     }
 
     private function collectAttachments($request)
@@ -343,6 +376,46 @@ class LegalCaseOpinionServices
             'is_correct' => $isCorrect,
         ]);
 
+        // N3 — tell the opinion author (consultant/lawyer) that the judge ADOPTED
+        // their opinion, so they see the adoption in their notifications. Only on
+        // a positive review; a rejection is not announced. Runs outside any
+        // transaction here, so send directly (no DB::afterCommit). Fail-soft.
+        if ($isCorrect === true) {
+            $this->notifyAuthorOnOpinionAdopted($opinion);
+        }
+
         return $opinion;
+    }
+
+    private function notifyAuthorOnOpinionAdopted(LegalCaseOpinion $opinion): void
+    {
+        $author = $opinion->user;
+        if (! $author) {
+            return;
+        }
+
+        $legalCase = $opinion->legalCase;
+        if (! $legalCase) {
+            return;
+        }
+
+        $data = [
+            'model_id' => $legalCase->id,
+            'title' => [
+                'ar' => 'تم اعتماد رأيك',
+                'en' => 'Your opinion was adopted',
+            ],
+            'body' => [
+                'ar' => 'اعتمد القاضي رأيك في القضية رقم ' . $legalCase->id,
+                'en' => 'The judge adopted your opinion on case number ' . $legalCase->id,
+            ],
+            'type' => 'opinion_adopted',
+        ];
+
+        try {
+            Notification::send($author, new LegalCaseNotification($legalCase, $data));
+        } catch (\Throwable $e) {
+            \Log::warning('Opinion adopted notification failed: ' . $e->getMessage());
+        }
     }
 }

@@ -163,18 +163,26 @@ class LegalCaseService
             $this->validateUserCanCreateCase($group);
             foreach ($participants as $participant) {
                 if ($participant['role'] == 'defendant') {
-                    // A defendant must be a CITIZEN of the group — a judge,
-                    // lawyer or consultant is never the accused. The request only
-                    // validates `exists:users,id`, so this is the real gate
-                    // (the app filters the picker to citizens too). Status-agnostic
-                    // on purpose: a non-`accepted` status value must not turn a
-                    // legitimate citizen defendant into a false rejection.
+                    // A defendant may be ANY group member — citizen, lawyer or
+                    // consultant — EXCEPT the judge (group owner), who is inherently
+                    // un-suable. The request only validates `exists:users,id`, so this
+                    // is the real gate: membership (fail-closed), then the judge, then
+                    // anyone granted `lawsuit_immunity`. Status-agnostic on purpose: a
+                    // non-`accepted` status value must not turn a legitimate defendant
+                    // into a false rejection.
                     $defendantRole = $group->users()
                         ->where('user_id', $participant['user_id'])
                         ->first()?->pivot?->role;
-                    if ($defendantRole !== GroupRole::CITIZEN->value) {
-                        throw ValidationException::withMessages([__('The defendant must be a citizen of the group')]);
+                    // Must be a member of the group (fail-closed).
+                    if ($defendantRole === null) {
+                        throw ValidationException::withMessages([__('The defendant must be a member of the group')]);
                     }
+                    // Only the JUDGE (group owner) is inherently un-suable — compare by
+                    // user_id so it holds even if the owner's stored pivot role has drifted.
+                    if ((int) $participant['user_id'] === (int) $group->user_id || $defendantRole === GroupRole::JUDGE->value) {
+                        throw ValidationException::withMessages([__('The judge cannot be sued')]);
+                    }
+                    // Granted immunity blocks any remaining role (citizen / lawyer / consultant).
                     if ($this->groupPermissionService->hasPermission($participant['user_id'], $group, 'lawsuit_immunity')) {
                         throw ValidationException::withMessages([__('The defendant has immunity against lawsuits')]);
                     }

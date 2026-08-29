@@ -35,6 +35,11 @@ class AgoraService
             'channel_name' => $channelName,
             'token' => $token,
             'uid' => $uid,
+            // Return the exact App ID the token was signed with so the client
+            // reads it from the server instead of a compile-time constant. Reuse
+            // the local $appId to guarantee it matches the signing App ID — a
+            // mismatch is a silent join failure on the client, not an error.
+            'app_id' => $appId,
         ];
     }
 }

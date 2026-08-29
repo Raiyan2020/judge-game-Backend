@@ -32,15 +32,15 @@ class LegalCaseRequest extends FormRequest
             'participants.*.user_id' => 'required|integer|exists:users,id',
             'participants.*.role' => 'required|string|in:defendant,witness,plaintiff_lawyer',
             'images' => 'nullable|array',
-            'images.*' => 'image|max:10240',
+            'images.*' => 'image|max:15360',
             'videos' => 'nullable|array',
             // Validate by real MIME, not extension: a camera video (iOS
             // video/quicktime .mov, Android video/mp4 / 3gpp) failed `mimes:`
-            // extension-guessing. Cap raised to 50MB — camera clips exceed 10MB.
+            // extension-guessing. Uniform 15MB cap across all evidence types.
             // (JG-030; also raise php.ini upload_max_filesize/post_max_size.)
-            'videos.*' => 'mimetypes:video/mp4,video/quicktime,video/x-msvideo,video/3gpp,video/x-matroska|max:51200',
+            'videos.*' => 'mimetypes:video/mp4,video/quicktime,video/x-msvideo,video/3gpp,video/x-matroska|max:15360',
             'audios' => 'nullable|array',
-            'audios.*' => 'mimetypes:audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/x-m4a,audio/aac|max:20480',
+            'audios.*' => 'mimetypes:audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/x-m4a,audio/aac|max:15360',
         ];
     }
 

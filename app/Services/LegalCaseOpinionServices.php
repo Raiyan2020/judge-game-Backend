@@ -82,6 +82,12 @@ class LegalCaseOpinionServices
                 if ($legalCase->status === LegalCaseStatus::APPEAL->value) {
                     $this->notifyJudgeOnAppealOpinion($legalCase);
                 }
+
+                // The judge must also hear about every FIRST-INSTANCE opinion
+                // (new/ongoing) — from any giver — not only the appeal-stage one
+                // above. Gate on the case STATUS, not resolveStage() (which
+                // collapses ongoing→appeal).
+                $this->notifyJudgeOnFirstInstanceOpinion($legalCase, $legalCaseOpinion);
             });
 
             DB::commit();
@@ -147,6 +153,75 @@ class LegalCaseOpinionServices
         ];
 
         Notification::send($judge->user, new LegalCaseNotification($legalCase, $data));
+    }
+
+    private function notifyJudgeOnFirstInstanceOpinion($legalCase, $legalCaseOpinion): void
+    {
+        // First-instance only (new/ongoing). Use the raw status, NOT
+        // resolveStage() (which maps every non-NEW status to APPEAL and would
+        // misfire on an appeal-stage opinion already handled above).
+        if (! in_array(
+            $legalCase->status,
+            [LegalCaseStatus::NEW->value, LegalCaseStatus::ONGOING->value],
+            true
+        )) {
+            return;
+        }
+
+        $judge = $legalCase->judge;
+        if (! $judge || ! $judge->user) {
+            return;
+        }
+
+        // Don't notify the judge about an opinion they submitted themselves.
+        if ($judge->user_id === $legalCaseOpinion->user_id) {
+            return;
+        }
+
+        $giver = $this->giverLabel($legalCaseOpinion->role);
+
+        $data = [
+            'model_id' => $legalCase->id,
+            'title' => [
+                'ar' => 'رأي جديد في القضية',
+                'en' => 'New opinion on the case',
+            ],
+            'body' => [
+                'ar' => $giver['ar'] . ' رأيه في القضية رقم ' . $legalCase->id,
+                'en' => $giver['en'] . ' on case number ' . $legalCase->id,
+            ],
+            'type' => 'case_opinion',
+        ];
+
+        Notification::send($judge->user, new LegalCaseNotification($legalCase, $data));
+    }
+
+    /**
+     * Maps a CaseRole value to a bilingual "the X submitted their opinion" label
+     * naming the giver (plaintiff lawyer / defendant lawyer / consultant).
+     *
+     * @return array{ar: string, en: string}
+     */
+    private function giverLabel(?string $role): array
+    {
+        return match ($role) {
+            CaseRole::PLAINTIFF_LAWYER->value => [
+                'ar' => 'قدّم محامي المدعي',
+                'en' => "The plaintiff's lawyer submitted their opinion",
+            ],
+            CaseRole::DEFENDANT_LAWYER->value => [
+                'ar' => 'قدّم محامي المدعى عليه',
+                'en' => "The defendant's lawyer submitted their opinion",
+            ],
+            CaseRole::CONSULTANT->value => [
+                'ar' => 'قدّم المستشار',
+                'en' => 'The consultant submitted their opinion',
+            ],
+            default => [
+                'ar' => 'قُدّم',
+                'en' => 'An opinion was submitted',
+            ],
+        };
     }
 
     private function collectAttachments($request)

@@ -190,5 +190,8 @@
     "all": "All",
     "banner type": "Banner type",
     "home banner": "Home banner",
-    "news banner": "News banner"
+    "news banner": "News banner",
+    "The judge cannot be sued": "The judge cannot be sued",
+    "The defendant must be a member of the group": "The defendant must be a member of the group",
+    "The defendant has immunity against lawsuits": "The defendant has immunity against lawsuits"
 }

@@ -30,8 +30,9 @@ class GroupMemberController extends Controller
 
       // Flag lawsuit immunity per member so the submit-case form can red-note an
       // immune defendant BEFORE the server 422s. Resolved once for the whole
-      // group (no N+1). A court officer is un-suable by role too; this covers
-      // the citizen-with-granted-immunity case the app can't infer.
+      // group (no N+1). Only the judge (group owner) is un-suable by role now;
+      // consultants and lawyers ARE suable unless granted immunity, so this flag
+      // covers the granted-immunity case the app can't infer for any role.
       $immune = array_flip(
          $this->permissionService->usersWithPermission($group, 'lawsuit_immunity')
       );

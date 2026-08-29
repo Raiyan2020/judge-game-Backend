@@ -38,13 +38,13 @@ class StoreLegalCaseOpinionRequest extends FormRequest
             'legal_arguments.requests' => [$this->canWriteArguments() ? 'required' : 'nullable', 'string'],
             'final_requests' => ['nullable', 'string'],
             'images' => 'nullable|array',
-            'images.*' => 'image|max:10240',
+            'images.*' => 'image|max:15360',
             'videos' => 'nullable|array',
-            // Real-MIME validation so camera clips (quicktime/3gpp) pass; 50MB
-            // cap for camera video size (JG-030).
-            'videos.*' => 'mimetypes:video/mp4,video/quicktime,video/x-msvideo,video/3gpp,video/x-matroska|max:51200',
+            // Real-MIME validation so camera clips (quicktime/3gpp) pass;
+            // uniform 15MB cap across all evidence types (JG-030).
+            'videos.*' => 'mimetypes:video/mp4,video/quicktime,video/x-msvideo,video/3gpp,video/x-matroska|max:15360',
             'audios' => 'nullable|array',
-            'audios.*' => 'mimes:mp3,wav,m4a|max:10240',
+            'audios.*' => 'mimes:mp3,wav,m4a|max:15360',
         ];
     }
 

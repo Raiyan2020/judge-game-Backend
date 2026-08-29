@@ -115,6 +115,11 @@ class GroupService
     private function groupRanking(?int $countryId = null): array
     {
         $query = \Illuminate\Support\Facades\DB::table('group_user')
+            // Inner-join `groups` so a rank can only accrue to a still-existing
+            // group: an orphaned `group_user` row (group deleted, membership row
+            // left behind) is dropped and can never surface a phantom rank for a
+            // missing group in "أفضل المجموعات".
+            ->join('groups', 'groups.id', '=', 'group_user.group_id')
             ->leftJoin('points', 'points.user_id', '=', 'group_user.user_id')
             ->select(
                 'group_user.group_id', 
@@ -128,8 +133,9 @@ class GroupService
             ->orderByDesc('pts');
 
         if ($countryId) {
-            $query->join('groups', 'groups.id', '=', 'group_user.group_id')
-                  ->join('users', 'users.id', '=', 'groups.user_id')
+            // `groups` is already joined unconditionally above; only the owner's
+            // country needs adding here.
+            $query->join('users', 'users.id', '=', 'groups.user_id')
                   ->where('users.country_id', $countryId);
         }
 

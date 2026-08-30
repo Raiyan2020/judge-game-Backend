@@ -305,19 +305,19 @@ class LegalCaseOpinionServices
     {
         $user = auth()->user();
 
-        $participant = $legalCase->participants()
-            ->where('user_id', $user->id)
-            ->first();
+        // Prefer the lawyer role for a self-representing defendant so they may
+        // request an appeal (their `defendant` row alone would be rejected).
+        $role = $legalCase->participantRoleFor($user->id);
 
-        if ($participant) {
+        if ($role !== null) {
             $allowedRoles = [
                 CaseRole::PLAINTIFF_LAWYER->value,
                 CaseRole::DEFENDANT_LAWYER->value,
                 CaseRole::CONSULTANT->value,
             ];
 
-            if (in_array($participant->role, $allowedRoles)) {
-                return $participant->role;
+            if (in_array($role, $allowedRoles, true)) {
+                return $role;
             }
 
             throw ValidationException::withMessages([
@@ -387,12 +387,13 @@ class LegalCaseOpinionServices
     {
         $user = auth()->user();
 
-        $participant = $legalCase->participants()
-            ->where('user_id', $user->id)
-            ->first();
+        // Prefer the lawyer role when the user holds both a party and a lawyer
+        // row (self-defense), so the opinion is stored under `defendant_lawyer`
+        // (not `defendant`) and renders in the footer.
+        $role = $legalCase->participantRoleFor($user->id);
 
-        if ($participant) {
-            return $participant->role;
+        if ($role !== null) {
+            return $role;
         }
 
         return $this->assignConsultantIfEligible($legalCase, $user);

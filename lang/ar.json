@@ -133,6 +133,8 @@
     "The case is no longer open for assigning a lawyer":"القضية لم تعد مفتوحة لتعيين محامٍ.",
     "The selected lawyer is not a lawyer in this group":"الشخص المختار ليس محاميًا في هذه المجموعة.",
     "The plaintiff lawyer cannot also defend the defendant":"لا يمكن أن يكون محامي المدعي هو نفسه محامي المدعى عليه.",
+    "The plaintiff cannot be assigned as the defence lawyer":"لا يمكن تعيين المدعي محاميًا للدفاع.",
+    "The same person cannot be both a defendant and the plaintiff lawyer":"لا يمكن أن يكون نفس الشخص مدعى عليه ومحاميًا للمدعي.",
     "Only citizens can create legal cases":"المواطنون فقط هم من يمكنهم رفع القضايا.",
     "The defendant must be a citizen of the group":"يجب أن يكون المدعى عليه مواطنًا في المجموعة.",
     "You have already submitted your opinion for this case":"لقد قدّمت رأيك في هذه القضية بالفعل.",

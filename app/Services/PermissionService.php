@@ -148,12 +148,26 @@ class PermissionService
         $verbAr = $granted ? 'مُنحت' : 'سُحبت';
         $verbEn = $granted ? 'granted to' : 'revoked from';
 
+        // Arabic preposition attaches to the subject: when GRANTED the لام of
+        // جر attaches to the following word — a label starting with "ال"
+        // contracts to "لل" ("المستشارين" → "للمستشارين"), a bare name takes a
+        // plain "لـ". When REVOKED the correct preposition is "من" ("سُحبت من …"),
+        // not "لـ". (Was "لـ" for both, producing "مُنحت لـالمستشارين".)
+        $subjectAr = $subjectLabel['ar'];
+        if ($granted) {
+            $subjectPhraseAr = mb_substr($subjectAr, 0, 2) === 'ال'
+                ? 'ل' . mb_substr($subjectAr, 1)
+                : 'ل' . $subjectAr;
+        } else {
+            $subjectPhraseAr = 'من ' . $subjectAr;
+        }
+
         $this->events->notifyGroupEvent(
             $group,
             'permission_changed',
             title: ['ar' => 'تغيير صلاحية', 'en' => 'Permission changed'],
             body: [
-                'ar' => 'صلاحية "' . $permAr . '" ' . $verbAr . ' لـ' . $subjectLabel['ar'],
+                'ar' => 'صلاحية "' . $permAr . '" ' . $verbAr . ' ' . $subjectPhraseAr,
                 'en' => 'Permission "' . $permEn . '" ' . $verbEn . ' ' . $subjectLabel['en'],
             ],
             actor: auth()->user(),

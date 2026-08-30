@@ -417,6 +417,18 @@ class LegalCaseService
             throw ValidationException::withMessages([__('The plaintiff lawyer cannot also defend the defendant')]);
         }
 
+        // You can't hire the very person suing you: reject when the chosen
+        // lawyer is the case's plaintiff (the opposing party). Self-defense —
+        // lawyer_id == the defendant — stays allowed, so only the plaintiff is
+        // blocked here.
+        $plaintiffId = $case->participants()
+            ->where('role', CaseRole::PLAINTIFF->value)
+            ->value('user_id');
+
+        if ($plaintiffId !== null && (int) $plaintiffId === (int) $request['lawyer_id']) {
+            throw ValidationException::withMessages([__('The plaintiff cannot be assigned as the defence lawyer')]);
+        }
+
         $case->participants()->create([
             'user_id' => $request['lawyer_id'],
             'role' => CaseRole::DEFENDANT_LAWYER->value,

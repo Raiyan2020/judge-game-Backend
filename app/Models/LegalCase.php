@@ -87,8 +87,35 @@ class LegalCase extends Model implements HasMedia
             return null;
         }
 
-        $participant = $this->participants->firstWhere('user_id', auth()->id());
-        return $participant ? $participant->role : null;
+        return $this->participantRoleFor(auth()->id());
+    }
+
+    /**
+     * Resolve a user's effective role in this case.
+     *
+     * A user may legitimately hold BOTH a party row (defendant/plaintiff) AND a
+     * lawyer row (defendant_lawyer/plaintiff_lawyer) for the same case when they
+     * defend themselves. In that case the lawyer role wins so the footer shows,
+     * the opinion is stored under the lawyer role, and appeals are permitted.
+     * A user with a single role gets exactly that role back.
+     */
+    public function participantRoleFor(int $userId): ?string
+    {
+        $rows = $this->participants->where('user_id', $userId);
+
+        if ($rows->isEmpty()) {
+            return null;
+        }
+
+        // Prefer a lawyer role when the user holds multiple party rows
+        // (self-defense: a defendant who is also their own lawyer).
+        $lawyer = $rows->first(fn ($p) => in_array(
+            $p->role,
+            [CaseRole::DEFENDANT_LAWYER->value, CaseRole::PLAINTIFF_LAWYER->value],
+            true
+        ));
+
+        return $lawyer?->role ?? $rows->first()->role;
     }
 
     /**

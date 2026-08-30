@@ -58,6 +58,20 @@ class LegalCaseRequest extends FormRequest
             if (!$roles->contains('plaintiff_lawyer')) {
                 $validator->errors()->add('participants', __('At least one plaintiff lawyer is required in the group to create a legal case'));
             }
+
+            // A party can't also be the opposing side's lawyer: reject when the
+            // same user_id appears as BOTH the defendant and the plaintiff lawyer.
+            $defendantIds = collect($participants)
+                ->where('role', 'defendant')
+                ->pluck('user_id');
+
+            $plaintiffLawyerIds = collect($participants)
+                ->where('role', 'plaintiff_lawyer')
+                ->pluck('user_id');
+
+            if ($defendantIds->intersect($plaintiffLawyerIds)->isNotEmpty()) {
+                $validator->errors()->add('participants', __('The same person cannot be both a defendant and the plaintiff lawyer'));
+            }
         });
     }
 }

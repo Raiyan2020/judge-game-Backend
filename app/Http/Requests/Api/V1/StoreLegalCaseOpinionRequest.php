@@ -59,11 +59,12 @@ class StoreLegalCaseOpinionRequest extends FormRequest
             return false;
         }
 
-        $participant = $case->participants()
-            ->where('user_id', auth()->id())
-            ->first();
+        // Prefer the lawyer role for a self-representing defendant so they are
+        // required to write the structured 5-field argument (not downgraded to
+        // free-text) — their `defendant` row alone would fail this gate.
+        $role = $case->participantRoleFor(auth()->id());
 
-        if (!$participant) {
+        if ($role === null) {
             return false;
         }
 
@@ -72,7 +73,7 @@ class StoreLegalCaseOpinionRequest extends FormRequest
             CaseRole::CONSULTANT->value,
         ];
 
-        return in_array($participant->role, $allowedRoles);
+        return in_array($role, $allowedRoles, true);
     }
 
     /**

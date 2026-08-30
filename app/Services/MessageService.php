@@ -259,11 +259,27 @@ class MessageService
     {
         $chat = $this->getChatByGroupId($data['group_id']);
 
-        $message = $this->createPollMessage($chat->id);
+        // Atomic, exactly like CreateAdsPoll: without a transaction a failure
+        // after createPollMessage() left an orphan `type=poll` ChatMessage with
+        // no ChatPoll row, which the app renders as a blank bubble.
+        [$message, $poll] = DB::transaction(function () use ($chat, $data, $type) {
+            $message = $this->createPollMessage($chat->id);
+            $poll = $this->createPollRecord($message->id, $data, $type);
+            $this->createPollOptions($poll);
 
-        $poll = $this->createPollRecord($message->id, $data, $type);
+            return [$message, $poll];
+        });
 
-        $this->createPollOptions($poll);
+        // Broadcast the poll message so the proposed law's vote card appears in
+        // «دراسة القانون» live — this was the missing piece vs CreateAdsPoll /
+        // postSystemMessage (the law-vote card never showed in the open chat).
+        // NOT ->toOthers(): the proposer's own chat must receive it too (mirrors
+        // postSystemMessage). Fail-soft: a broadcast error must not fail the poll.
+        try {
+            broadcast(new MessageSent($message));
+        } catch (\Throwable $e) {
+            \Log::warning('Broadcast law-poll MessageSent failed: ' . $e->getMessage());
+        }
 
         return $poll;
     }

@@ -222,6 +222,8 @@
      "The defendant has immunity against lawsuits":"المدعى عليه لديه حصانة ضد الدعاوى القضائية",
      "The judge cannot be sued":"لا يمكن مقاضاة القاضي",
      "The defendant must be a member of the group":"يجب أن يكون المدعى عليه عضوًا في المجموعة",
+     "You cannot assign another judge — a group has a single judge (its owner). Choose citizen, lawyer, or consultant.":"لا يمكن تعيين قاضٍ آخر — لكل مجموعة قاضٍ واحد (مالكها). اختر مواطنًا أو محاميًا أو مستشارًا.",
+     "Please choose a role.":"من فضلك اختر دورًا.",
      "points":"النقاط",
      "action":"حدث",
      "role":"الدور",

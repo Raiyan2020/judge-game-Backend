@@ -148,6 +148,12 @@ Route::group(['middleware' => 'setLocale'], function () {
         // never be blocked by a lapsed subscription.
         Route::post('legal-cases/{legalCase}/close', [LegalCaseController::class, 'close']);
 
+        // The presiding judge nudges a case participant (defence lawyer /
+        // consultant) to file their opinion — sends a notification only, changes
+        // no case status. Not subscription-gated: coordination, not a paid
+        // judicial action (judge-only authorization is enforced in the service).
+        Route::post('legal-cases/{legalCase}/request-opinion', [LegalCaseController::class, 'requestOpinion']);
+
         Route::group(['middleware' => 'checkActiveSubscription'], function () {
             Route::post('legal-cases', [LegalCaseController::class, 'store']);
             Route::post('assign-lawyer', [LegalCaseController::class, 'assignDefendantLawyer']);

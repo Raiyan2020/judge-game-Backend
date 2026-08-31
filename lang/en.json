@@ -197,5 +197,8 @@
     "The judge role belongs to the group owner and cannot be reassigned": "The judge role belongs to the group owner and cannot be reassigned",
     "You cannot assign another judge — a group has a single judge (its owner). Choose citizen, lawyer, or consultant.": "You cannot assign another judge — a group has a single judge (its owner). Choose citizen, lawyer, or consultant.",
     "Please choose a role.": "Please choose a role.",
-    "You cannot invite a member as judge — a group's judge is its owner.": "You cannot invite a member as judge — a group's judge is its owner."
+    "You cannot invite a member as judge — a group's judge is its owner.": "You cannot invite a member as judge — a group's judge is its owner.",
+    "No defense lawyer has been assigned to this case yet.": "No defense lawyer has been assigned to this case yet.",
+    "No consultant has been assigned to this case yet.": "No consultant has been assigned to this case yet.",
+    "The opinion request has been sent": "The opinion request has been sent"
 }

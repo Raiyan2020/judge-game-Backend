@@ -82,6 +82,80 @@ class LegalCaseService
     }
 
     /**
+     * The presiding judge nudges a case participant (defence lawyer or
+     * consultant) to file their opinion. This sends a notification ONLY — it
+     * changes no case status. The case lifecycle has no intermediate
+     * "in-progress" state and no new→ongoing endpoint (a case only becomes
+     * `ongoing` after a first-instance conviction), so there is nothing to
+     * transition; the judge is simply asking the participant to act.
+     *
+     * @return string a localized success message
+     */
+    public function requestOpinion($legalCase, array $data): string
+    {
+        $userId = auth()->id();
+
+        // JUDGE-ONLY. The presiding judge is the group owner, attached as the
+        // `judge` participant. Unlike closeCase/scheduleHearing this is NOT open
+        // to any party — a lawyer must never be able to nudge himself. Cast both
+        // sides of every comparison (the older ensureUserIsJudge compares
+        // without casts; the newer methods here cast for a reason).
+        $isOwner = $legalCase->group && (int) $legalCase->group->user_id === (int) $userId;
+        $isJudgeParticipant = $legalCase->judge && (int) $legalCase->judge->user_id === (int) $userId;
+        if (! $isOwner && ! $isJudgeParticipant) {
+            throw ValidationException::withMessages([__('You are not authorized to perform this action')]);
+        }
+
+        // Map the app-facing role to the stored participant role: the app sends
+        // `defense_lawyer`, but the participant row is `defendant_lawyer`.
+        $isConsultant = $data['role'] === 'consultant';
+        $participantRole = $isConsultant
+            ? CaseRole::CONSULTANT->value
+            : CaseRole::DEFENDANT_LAWYER->value;
+
+        $participant = $legalCase->participants()
+            ->where('role', $participantRole)
+            ->first();
+
+        $missingMessage = $isConsultant
+            ? __('No consultant has been assigned to this case yet.')
+            : __('No defense lawyer has been assigned to this case yet.');
+
+        if (! $participant) {
+            throw ValidationException::withMessages([$missingMessage]);
+        }
+
+        $user = User::find($participant->user_id);
+        if (! $user) {
+            throw ValidationException::withMessages([$missingMessage]);
+        }
+
+        // Send the nudge. FcmService swallows its own errors (logs and returns),
+        // so the FCM leg never throws; the database notification is the durable
+        // record AND the entire payload of this endpoint, so it is deliberately
+        // NOT wrapped in a try/catch that would report success while sending
+        // nothing.
+        Notification::send($user, new LegalCaseNotification($legalCase, [
+            'model_id' => $legalCase->id,
+            'title' => $isConsultant
+                ? ['ar' => 'طلب رأي استشاري', 'en' => 'Consultant opinion requested']
+                : ['ar' => 'طلب مرافعة الدفاع', 'en' => 'Defense opinion requested'],
+            'body' => $isConsultant
+                ? [
+                    'ar' => 'يطلب القاضي تقديم رأيك الاستشاري في القضية رقم ' . $legalCase->id,
+                    'en' => 'The judge requests your consultant opinion on case number ' . $legalCase->id,
+                ]
+                : [
+                    'ar' => 'يطلب القاضي تقديم مرافعتك في القضية رقم ' . $legalCase->id,
+                    'en' => 'The judge requests your defense opinion on case number ' . $legalCase->id,
+                ],
+            'type' => $isConsultant ? 'opinion_requested_consultant' : 'opinion_requested_defense',
+        ]));
+
+        return __('The opinion request has been sent');
+    }
+
+    /**
      * Schedule a hearing for a case — the "تحديد جلسة" action, which previously
      * had no backend at all. Only the presiding judge or a party may schedule.
      * All parties are notified.
@@ -451,7 +525,11 @@ class LegalCaseService
                     'ar' => 'تم تعيينك كمحامي للمدعي في القضية رقم ' . $legalCase->id,
                     'en' => 'You have been assigned as the plaintiff lawyer in case number ' . $legalCase->id,
                 ],
-                'type' => 'new_legal_case',
+                // Routes the app to the purpose-built PlaintiffLawyerCaseView
+                // (the dedicated intake screen), not generic case details. This
+                // notification is sent ONLY to the plaintiff lawyer below, so the
+                // type change is scoped to them alone.
+                'type' => 'plaintiff_lawyer_assign',
             ];
             Notification::send($plaintiffLawyer->user, new LegalCaseNotification($legalCase, $data));
         }

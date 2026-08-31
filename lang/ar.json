@@ -338,5 +338,8 @@
     "required count max exceeded": "يجب ألا يتجاوز :attribute الرقم :max.",
     "banner type": "نوع البانر",
     "home banner": "بانر الرئيسية",
-    "news banner": "بانر الأخبار"
+    "news banner": "بانر الأخبار",
+    "No defense lawyer has been assigned to this case yet.": "لم يتم تعيين محامٍ للدفاع في هذه القضية بعد.",
+    "No consultant has been assigned to this case yet.": "لم يتم تعيين مستشار في هذه القضية بعد.",
+    "The opinion request has been sent": "تم إرسال طلب الرأي بنجاح."
 }

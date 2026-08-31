@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\AssignDefendantLawyerRequest;
 use App\Http\Requests\Api\V1\LegalCaseRequest;
+use App\Http\Requests\Api\V1\RequestOpinionRequest;
 use App\Http\Resources\Api\V1\BaseCollection;
 use App\Http\Resources\Api\V1\LegalCaseListResource;
 use App\Http\Resources\Api\V1\LegalCaseResource;
@@ -100,7 +101,18 @@ class LegalCaseController extends Controller
         $legalCase->load($this->relations());
         return \responder::success(new LegalCaseResource($legalCase));
     }
-    
+
+    /**
+     * The presiding judge nudges a case participant (defence lawyer /
+     * consultant) to file their opinion. Sends a notification only — it changes
+     * no case status — so the response is a bare success message, not the case.
+     */
+    public function requestOpinion(RequestOpinionRequest $request, LegalCase $legalCase)
+    {
+        $message = $this->legalCaseService->requestOpinion($legalCase, $request->validated());
+        return \responder::success($message);
+    }
+
 
 
     private function relations(): array

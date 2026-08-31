@@ -137,6 +137,10 @@ class LegalCase extends Model implements HasMedia
         if (in_array($this->status, [
             LegalCaseStatus::CLOSED->value,
             LegalCaseStatus::EXECUTION->value,
+            // Not yet officially filed — held with the plaintiff lawyer. No
+            // consultant may self-initiate on it (defence-in-depth beside the
+            // createOpinion pending-case guard and the `show` 403).
+            LegalCaseStatus::PENDING_LAWYER->value,
         ], true)) {
             return false;
         }

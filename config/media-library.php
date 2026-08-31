@@ -12,7 +12,7 @@ return [
      * The maximum file size of an item in bytes.
      * Adding a larger file will result in an exception.
      */
-    'max_file_size' => 1024 * 1024 * 10, // 10MB
+    'max_file_size' => 16 * 1024 * 1024, // 16MB (>= the 15MB images.* request cap)
 
     /*
      * This queue connection will be used to generate derived and responsive images.

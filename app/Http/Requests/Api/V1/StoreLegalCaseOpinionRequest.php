@@ -55,7 +55,14 @@ class StoreLegalCaseOpinionRequest extends FormRequest
     {
         $case = $this->getCase();
 
-        if (!$case || $case->status !== LegalCaseStatus::NEW->value) {
+        // Structured 5-field arguments are required at first instance, pre-ruling
+        // — `new` OR `in_progress` (a hearing scheduled does not change the
+        // filing shape). Any later stage falls back to free-text `opinion`.
+        if (!$case || !in_array(
+            $case->status,
+            [LegalCaseStatus::NEW->value, LegalCaseStatus::IN_PROGRESS->value],
+            true
+        )) {
             return false;
         }
 

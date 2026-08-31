@@ -154,10 +154,17 @@ Route::group(['middleware' => 'setLocale'], function () {
         // judicial action (judge-only authorization is enforced in the service).
         Route::post('legal-cases/{legalCase}/request-opinion', [LegalCaseController::class, 'requestOpinion']);
 
+        // NOT subscription-gated at the route: the plaintiff lawyer's OFFICIATING
+        // opinion is the ONLY act that files a `pending_lawyer` case (already paid
+        // for by the citizen), so a lapsed lawyer must still be able to file it or
+        // the case is stuck forever. The subscription requirement is enforced
+        // INSIDE `addOpinion` for every OTHER add-opinion (defense / consultant /
+        // appeal), using the same 402 shape as `checkActiveSubscription`.
+        Route::post('add-opinion', [LegalCaseOpinionController::class, 'addOpinion']);
+
         Route::group(['middleware' => 'checkActiveSubscription'], function () {
             Route::post('legal-cases', [LegalCaseController::class, 'store']);
             Route::post('assign-lawyer', [LegalCaseController::class, 'assignDefendantLawyer']);
-            Route::post('add-opinion', [LegalCaseOpinionController::class, 'addOpinion']);
             Route::post('request-appeal', [LegalCaseOpinionController::class, 'requestAppeal']);
             Route::post('add-first-judgment', [LegalCaseJudgmentController::class, 'storeFirstJudgment']);
             Route::post('add-final-judgment', [LegalCaseJudgmentController::class, 'storeFinalJudgment']);

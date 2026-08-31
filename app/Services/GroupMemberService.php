@@ -377,7 +377,14 @@ class GroupMemberService
                 $query->where('user_id', $userId)
                       ->where('role', '!=', $excludedRole);
             })
-            ->whereNot('status', LegalCaseStatus::CLOSED->value)
+            // `pending_lawyer` is NOT yet an officially-filed case (invisible to
+            // the parties until the plaintiff lawyer files it), so it must not
+            // block a role change / leave / removal — mirroring the other places
+            // that special-case pending_lawyer.
+            ->whereNotIn('status', [
+                LegalCaseStatus::CLOSED->value,
+                LegalCaseStatus::PENDING_LAWYER->value,
+            ])
             ->count();
 
         if ($openCases > 0) {

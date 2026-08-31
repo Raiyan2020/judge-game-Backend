@@ -1,5 +1,7 @@
 {
-    "in_progress":"In Progress",
+    "in_progress":"Ongoing",
+    "A hearing can only be scheduled for a case that is being heard":"A hearing can only be scheduled for a case that is being heard",
+    "You cannot assign yourself as the plaintiff lawyer":"You cannot assign yourself as the plaintiff lawyer",
     "confirmed":"Confirmed",
     "in_the_way":"In The Way",
     "delivered":"Delivered",
@@ -43,7 +45,8 @@
     "paid":"Paid",
     "failed":"Failed",
     "new":"New",
-    "ongoing":"Ongoing",
+    "pending_lawyer":"Pending Lawyer",
+    "ongoing":"First-Instance Ruling",
     "appeal":"Appeal",
     "execution":"Under Enforcement",
     "closed":"Closed",

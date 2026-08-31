@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Enums\GroupRole;
+use App\Models\Group;
 use Illuminate\Foundation\Http\FormRequest;
 
 class LegalCaseRequest extends FormRequest
@@ -71,6 +73,40 @@ class LegalCaseRequest extends FormRequest
 
             if ($defendantIds->intersect($plaintiffLawyerIds)->isNotEmpty()) {
                 $validator->errors()->add('participants', __('The same person cannot be both a defendant and the plaintiff lawyer'));
+            }
+
+            // The named plaintiff lawyer only validates `exists:users,id`, so a
+            // citizen could name a non-lawyer / arbitrary user and wedge the case
+            // permanently at `pending_lawyer` (that user can never officially
+            // file). Require each to be (a) distinct from the filer and (b) an
+            // ACCEPTED `lawyer` member of the group — mirroring the pivot check
+            // `LegalCaseService::assignDefendantLawyer` makes and the filing-path
+            // lawyer head-count, which already scope lawyers to `accepted`.
+            // Bail out unless the group resolved: `after()` runs even when
+            // `rules()` failed, so on a bad/absent `group_id` there is no group
+            // to query (avoids a null-deref) and the `exists` error already
+            // stands.
+            $group = $this->group_id ? Group::find($this->group_id) : null;
+
+            if ($group) {
+                $filerId = auth()->id();
+
+                foreach ($plaintiffLawyerIds->filter()->unique() as $lawyerId) {
+                    if ((int) $lawyerId === (int) $filerId) {
+                        $validator->errors()->add('participants', __('You cannot assign yourself as the plaintiff lawyer'));
+                        continue;
+                    }
+
+                    $isGroupLawyer = $group->users()
+                        ->where('user_id', $lawyerId)
+                        ->wherePivot('role', GroupRole::LAWYER->value)
+                        ->wherePivot('status', 'accepted')
+                        ->exists();
+
+                    if (! $isGroupLawyer) {
+                        $validator->errors()->add('participants', __('The selected lawyer is not a lawyer in this group'));
+                    }
+                }
             }
         });
     }

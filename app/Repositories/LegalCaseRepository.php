@@ -20,9 +20,36 @@ class LegalCaseRepository extends BaseRepository
         parent::__construct($model);
     }
 
+    /**
+     * Row-locked fetch for use inside a transaction. Serialises concurrent
+     * plaintiff-lawyer submissions so two of them cannot both read the case as
+     * `pending_lawyer` and double-fire the case-filed effects (there is no
+     * unique constraint to lean on).
+     */
+    public function findForUpdate($id)
+    {
+        return $this->model->newQuery()->lockForUpdate()->find($id);
+    }
+
     public function index($filters)
     {
         $query = $this->model->query();
+
+        // A `pending_lawyer` case is officially unfiled and must be visible ONLY
+        // to its assigned plaintiff lawyer (the «بانتظار رفعي» bucket). Applied
+        // UNCONDITIONALLY — before the status filter — so it also covers a
+        // no-status listing of the group, not just an explicit
+        // `status=pending_lawyer` request. Fails closed when no user id is
+        // passed (matches nothing pending).
+        $currentUserId = $filters['current_user_id'] ?? 0;
+        $query->where(function ($q) use ($currentUserId) {
+            $q->where('status', '!=', LegalCaseStatus::PENDING_LAWYER->value)
+                ->orWhereHas('participants', function ($p) use ($currentUserId) {
+                    $p->where('user_id', $currentUserId)
+                        ->where('role', CaseRole::PLAINTIFF_LAWYER->value);
+                });
+        });
+
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
         }
@@ -44,18 +71,40 @@ class LegalCaseRepository extends BaseRepository
         return $news;
     }
 
-    public function getCasesStatus($groupId = null)
+    public function getCasesStatus($groupId = null, $userId = null)
     {
-      return $this->model
+      $counts = $this->model
         ->when($groupId, fn ($q) => $q->where('group_id', $groupId))
         ->selectRaw("
             COUNT(CASE WHEN status = 'new' THEN 1 END) as new_cases,
+            COUNT(CASE WHEN status = 'in_progress' THEN 1 END) as in_progress_cases,
             COUNT(CASE WHEN status = 'ongoing' THEN 1 END) as on_going_cases,
             COUNT(CASE WHEN status = 'appeal' THEN 1 END) as appeal_cases,
             COUNT(CASE WHEN status = 'execution' THEN 1 END) as execution_cases,
             COUNT(CASE WHEN status = 'closed' THEN 1 END) as closed_cases
         ")
         ->first();
+
+      // The «بانتظار رفعي» counter is USER-scoped, not a group-wide tally: a
+      // `pending_lawyer` case is only ever visible to its assigned plaintiff
+      // lawyer, so this count is restricted to cases where the caller is that
+      // lawyer. Computed as a separate query (a participant-scoped conditional
+      // count can't live in the group-wide selectRaw) and merged as a dynamic
+      // attribute so it serializes alongside the others.
+      $pendingCount = 0;
+      if ($userId) {
+          $pendingCount = $this->model->newQuery()
+              ->when($groupId, fn ($q) => $q->where('group_id', $groupId))
+              ->where('status', LegalCaseStatus::PENDING_LAWYER->value)
+              ->whereHas('participants', function ($q) use ($userId) {
+                  $q->where('user_id', $userId)
+                    ->where('role', CaseRole::PLAINTIFF_LAWYER->value);
+              })
+              ->count();
+      }
+      $counts->pending_lawyer_cases = $pendingCount;
+
+      return $counts;
     }
 
     /**
@@ -225,6 +274,9 @@ class LegalCaseRepository extends BaseRepository
 
         $raisedCases = $this->model->newQuery()
             ->where('group_id', $groupId)
+            // A `pending_lawyer` case is not yet officially filed (hidden from the
+            // parties), so it must not leak a "+1 hidden case" into these tallies.
+            ->where('status', '!=', LegalCaseStatus::PENDING_LAWYER->value)
             ->whereHas('plaintiff', function ($query) use ($userId) {
                 $query->where('user_id', $userId);
             })
@@ -232,6 +284,7 @@ class LegalCaseRepository extends BaseRepository
 
         $defenseCases = $this->model->newQuery()
             ->where('group_id', $groupId)
+            ->where('status', '!=', LegalCaseStatus::PENDING_LAWYER->value)
             ->where(function ($query) use ($userId) {
                 $query->whereHas('defendant', function ($query) use ($userId) {
                     $query->where('user_id', $userId);
@@ -282,6 +335,9 @@ class LegalCaseRepository extends BaseRepository
 
         $inGroupAs = fn ($caseRole) => $this->model->newQuery()
             ->where('group_id', $groupId)
+            // Exclude not-yet-filed `pending_lawyer` cases from role tallies for
+            // the same visibility reason as above.
+            ->where('status', '!=', LegalCaseStatus::PENDING_LAWYER->value)
             ->whereHas('participants', function ($q) use ($userId, $caseRole) {
                 $q->where('user_id', $userId)->where('role', $caseRole);
             })->count();

@@ -34,6 +34,11 @@ class ChatPollResource extends JsonResource
             // the app locks voting when this is false.
             'can_vote' => !$this->is_closed
                 && (is_null($this->expires_at) || $this->expires_at->isFuture()),
+            // Whether the 24h window has been settled (closed by vote or expiry).
+            'is_closed' => (bool) $this->is_closed,
+            // The settled outcome of a LAW poll: approved | rejected | null (no
+            // law outcome — still open, or an ads poll which carries no verdict).
+            'result' => $this->result,
             'options' => $this->relationLoaded('options') ? ChatPollOptionsResource::collection($this->options)
                 : [],
         ];

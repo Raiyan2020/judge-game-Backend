@@ -38,4 +38,18 @@ class GroupMemberInviteRequest extends FormRequest
             ],
         ];
     }
+
+    /**
+     * `judge` passes the Enum rule (it is a valid GroupRole) and is rejected by
+     * `notIn`, whose message key is `role.not_in`. Without this override the
+     * client saw the raw "The selected role is invalid." — replace it with the
+     * clear, localized reason the invite was refused.
+     */
+    public function messages(): array
+    {
+        return [
+            'role.not_in' => __('You cannot invite a member as judge — a group\'s judge is its owner.'),
+            'role.required' => __('Please choose a role.'),
+        ];
+    }
 }

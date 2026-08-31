@@ -36,13 +36,17 @@ return Application::configure(basePath: dirname(__DIR__))
 
         ]);
     })
-    // ->withSchedule(function (Schedule $schedule) {
-    //     $schedule->job(new \App\Jobs\CloseExpiredExecutionCases)->daily();
-    //     $schedule->job(new \App\Jobs\ProcessExpiredPolls)->hourly();
-    //     // BUG9: auto-uphold un-appealed first-instance verdicts past 24h.
-    //     // Hourly so the 24h window closes promptly; lazy on-read also settles.
-    //     $schedule->job(new \App\Jobs\UpholdExpiredFirstInstanceCases)->hourly();
-    // })
+    ->withSchedule(function (Schedule $schedule) {
+        $schedule->job(new \App\Jobs\CloseExpiredExecutionCases)->daily();
+        // Settles expired law-vote polls server-authoritatively (enacts the
+        // carried majority, stamps result). The lazy on-read resolver in
+        // MessageService::index stays as the fallback. Requires the server cron
+        // `* * * * * php artisan schedule:run`.
+        $schedule->job(new \App\Jobs\ProcessExpiredPolls)->hourly();
+        // BUG9: auto-uphold un-appealed first-instance verdicts past 24h.
+        // Hourly so the 24h window closes promptly; lazy on-read also settles.
+        $schedule->job(new \App\Jobs\UpholdExpiredFirstInstanceCases)->hourly();
+    })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (AuthenticationException $e, Request $request) {
             if ($request->is('api/*')) {

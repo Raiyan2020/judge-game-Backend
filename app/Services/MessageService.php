@@ -411,12 +411,12 @@ class MessageService
     }
 
     /**
-     * Settle every poll whose 24h window has passed but is still open, applying
-     * the winning option (create / update / delete law when "yes" wins). This
-     * is the SAME rule as the `ProcessExpiredPolls` job, extracted here so it
-     * can also run lazily on read (group laws / group messages fetch) — a
-     * non-owner's law proposal actually resolves without a scheduler, which is
-     * otherwise optional infrastructure.
+     * Settle every poll whose 24h window has passed but is still open, enacting
+     * the law change (create / update / delete) when the approve option carries
+     * a majority. This is the SAME rule as the `ProcessExpiredPolls` job,
+     * extracted here so it can also run lazily on read (group laws / group
+     * messages fetch) — a non-owner's law proposal actually resolves without a
+     * scheduler, which is otherwise optional infrastructure.
      */
     public function resolveExpiredPolls($groupId = null): void
     {
@@ -429,79 +429,210 @@ class MessageService
                 });
             })
             ->with(['options.votes', 'chatMessage.chat'])
-            ->chunk(50, function ($polls) {
+            // chunkById (NOT chunk): the query filters on `is_closed = false` and
+            // the loop flips that to true, so OFFSET-based chunk() would skip the
+            // next page of unsettled polls once a claim actually closes a row.
+            // chunkById keys off `id > last`, stable under this mutation.
+            ->chunkById(50, function ($polls) {
                 foreach ($polls as $poll) {
-                    // Always close it so it is never re-evaluated, THEN apply.
-                    $poll->update(['is_closed' => true]);
-                    $this->applyPollResult($poll);
+                    try {
+                        // Close + apply atomically, and claim the poll so exactly
+                        // ONE reader settles it — concurrent chat opens / the job
+                        // can otherwise double-enact a law.
+                        $announcement = DB::transaction(function () use ($poll) {
+                            $claimed = ChatPoll::where('id', $poll->id)
+                                ->where('is_closed', false)
+                                ->update(['is_closed' => true]);
+
+                            // Another request already settled this poll → skip it.
+                            if ($claimed !== 1) {
+                                return null;
+                            }
+
+                            return $this->applyPollResult($poll);
+                        });
+
+                        // Fire notifications AFTER the transaction commits:
+                        // notifyGroupEvent does Pusher + FCM + DB writes and must
+                        // not run while the poll row is locked in the txn (this
+                        // path also runs on chat open, via index()).
+                        if ($announcement) {
+                            $this->firePollAnnouncement($announcement);
+                        }
+                    } catch (\Throwable $e) {
+                        // One bad poll must never break the loop or 500 the caller
+                        // (resolveExpiredPolls runs inside index() on chat open).
+                        \Log::warning(
+                            'resolveExpiredPolls: poll ' . ($poll->id ?? '?')
+                            . ' failed: ' . $e->getMessage()
+                        );
+                    }
                 }
             });
     }
 
-    protected function applyPollResult($poll): void
+    /**
+     * Settle ONE already-claimed poll: tally, enact the law change on a carried
+     * majority, and stamp `result`. Returns an announcement descriptor (or null)
+     * so the caller can notify AFTER the transaction commits — this method only
+     * touches the DB (see resolveExpiredPolls). Must be called with the poll's
+     * is_closed already flipped to true (the atomic claim).
+     */
+    protected function applyPollResult($poll): ?array
     {
-        $yes = $poll->options->firstWhere('option', 'yes')?->votes->count() ?? 0;
-        $no = $poll->options->firstWhere('option', 'no')?->votes->count() ?? 0;
-
-        // Enact ONLY on a carried affirmative majority. A no-quorum poll (0-0)
-        // or a tie must NOT pass — otherwise an unvoted "delete_law" proposal
-        // would silently delete the law the moment anyone opens the laws screen.
-        if ($yes === 0 || $yes <= $no) {
-            return;
+        // Only law polls carry an approve/reject decision. An ADS poll has
+        // arbitrary custom options, so it just closes here (is_closed is already
+        // claimed) — no positional tally, no result, no announcement.
+        $lawTypes = [
+            ChatPollType::CREATE_LAW->value,
+            ChatPollType::UPDATE_LAW->value,
+            ChatPollType::DELETE_LAW->value,
+        ];
+        if (! in_array($poll->type, $lawTypes, true)) {
+            return null;
         }
+
+        // Tally by POSITION, not by label. Law-poll options are ALWAYS created in
+        // order [approve, reject] (نعم then لا) by createPollOptions() with no
+        // explicit options — the order is backend-controlled. The labels are
+        // Arabic نعم/لا (never 'yes'/'no'), so the old firstWhere('option','yes')
+        // lookup counted 0-0 every time and NO proposal ever enacted. sortBy('id')
+        // makes the creation order deterministic (the eager load has no ORDER BY).
+        $ordered = $poll->options->sortBy('id')->values();
+        $approveCount = $ordered->first()?->votes->count() ?? 0;
+        $rejectCount = $ordered->skip(1)->first()?->votes->count() ?? 0;
+
+        // Enact ONLY on a carried affirmative majority. 0-0 (no quorum) or a tie
+        // must NOT pass — otherwise an unvoted "delete_law" proposal would
+        // silently delete the law the moment anyone opens the laws screen.
+        $enacted = $approveCount > 0 && $approveCount > $rejectCount;
 
         $groupId = $poll->chatMessage?->chat?->group_id;
+        $announcement = null;
 
-        switch ($poll->type) {
-            case ChatPollType::DELETE_LAW->value:
-                $law = GroupLaw::find($poll->group_law_id);
-                $description = $law?->description;
-                $law?->delete();
-                $this->announcePollLaw($groupId, 'تم حذف قانون بالتصويت', 'Law removed by vote', $description);
-                break;
+        if ($enacted) {
+            switch ($poll->type) {
+                case ChatPollType::DELETE_LAW->value:
+                    $law = GroupLaw::find($poll->group_law_id);
+                    if (! $law) {
+                        // Target already gone → not a real enactment.
+                        $enacted = false;
+                        break;
+                    }
+                    $description = $law->description;
+                    // nullOnDelete keeps the poll row + votes as an audit trail.
+                    $law->delete();
+                    $announcement = $this->approvedAnnouncement($groupId, 'تم حذف قانون بالتصويت', 'Law removed by vote', $description);
+                    break;
 
-            case ChatPollType::UPDATE_LAW->value:
-                $description = $poll->data['description'] ?? null;
-                GroupLaw::find($poll->group_law_id)?->update([
-                    'description' => $description,
-                    'reason' => $poll->data['reason'] ?? null,
-                ]);
-                $this->announcePollLaw($groupId, 'تم تعديل قانون بالتصويت', 'Law amended by vote', $description);
-                break;
+                case ChatPollType::UPDATE_LAW->value:
+                    $law = GroupLaw::find($poll->group_law_id);
+                    if (! $law) {
+                        $enacted = false;
+                        break;
+                    }
+                    $description = $poll->data['description'] ?? null;
+                    $attrs = ['description' => $description];
+                    // Only overwrite the reason when the amendment actually
+                    // carried one; a null/blank reason keeps the law's current
+                    // reason instead of wiping it.
+                    if (filled($poll->data['reason'] ?? null)) {
+                        $attrs['reason'] = $poll->data['reason'];
+                    }
+                    $law->update($attrs);
+                    $announcement = $this->approvedAnnouncement($groupId, 'تم تعديل قانون بالتصويت', 'Law amended by vote', $description);
+                    break;
 
-            case ChatPollType::CREATE_LAW->value:
-                $description = $poll->data['description'] ?? null;
-                GroupLaw::create([
-                    'group_id' => $groupId,
-                    'description' => $description,
-                    'reason' => $poll->data['reason'] ?? null,
-                ]);
-                $this->announcePollLaw($groupId, 'تم سنّ قانون جديد بالتصويت', 'New law enacted by vote', $description);
-                break;
+                case ChatPollType::CREATE_LAW->value:
+                    $description = $poll->data['description'] ?? null;
+                    GroupLaw::create([
+                        'group_id' => $groupId,
+                        'description' => $description,
+                        'reason' => $poll->data['reason'] ?? null,
+                    ]);
+                    $announcement = $this->approvedAnnouncement($groupId, 'تم سنّ قانون جديد بالتصويت', 'New law enacted by vote', $description);
+                    break;
+            }
         }
+
+        // Persist the outcome alongside the close. Query-builder update: bypasses
+        // mass-assignment (is_closed / result are intentionally NOT fillable) and
+        // never clobbers the is_closed already claimed in this transaction.
+        ChatPoll::where('id', $poll->id)->update([
+            'is_closed' => true,
+            'result' => $enacted ? 'approved' : 'rejected',
+        ]);
+
+        // Announce a rejection too — a proposal that failed the vote (or whose
+        // target law was already gone) tells the group it was rejected.
+        if (! $enacted) {
+            $announcement = $this->rejectedAnnouncement($groupId, $poll->type);
+        }
+
+        return $announcement;
     }
 
     /**
-     * Announces a poll-ENACTED law change on all three channels. The vote is a
-     * collective decision (no single actor), so everyone in the group is
-     * notified. Resolved lazily (`app(...)`) to avoid the MessageService ↔
-     * GroupEventService constructor cycle.
+     * Builds the announcement descriptor for an ENACTED law change (no side
+     * effects — the caller fires it after the transaction commits).
      */
-    private function announcePollLaw($groupId, string $ar, string $en, ?string $description): void
+    private function approvedAnnouncement($groupId, string $ar, string $en, ?string $description): ?array
     {
         if (! $groupId) {
-            return;
+            return null;
         }
-        $group = Group::find($groupId);
+        $suffix = $description ? (': ' . $description) : '';
+        return [
+            'groupId' => $groupId,
+            'title' => ['ar' => 'تغيير في القوانين', 'en' => 'Law changed'],
+            'body' => ['ar' => $ar . $suffix, 'en' => $en . $suffix],
+        ];
+    }
+
+    /**
+     * Builds the announcement descriptor for a REJECTED law proposal (failed the
+     * vote or its target law was already gone). Same three-channel path as an
+     * approval, so the group sees the outcome either way.
+     */
+    private function rejectedAnnouncement($groupId, string $type): ?array
+    {
+        if (! $groupId) {
+            return null;
+        }
+        $labels = [
+            ChatPollType::CREATE_LAW->value => ['ar' => 'إضافة', 'en' => 'add'],
+            ChatPollType::UPDATE_LAW->value => ['ar' => 'تعديل', 'en' => 'edit'],
+            ChatPollType::DELETE_LAW->value => ['ar' => 'حذف', 'en' => 'delete'],
+        ];
+        $label = $labels[$type] ?? ['ar' => '', 'en' => ''];
+        return [
+            'groupId' => $groupId,
+            'title' => ['ar' => 'تغيير في القوانين', 'en' => 'Law changed'],
+            'body' => [
+                'ar' => 'رُفض اقتراح ' . $label['ar'] . ' قانون بالتصويت',
+                'en' => 'The ' . $label['en'] . '-law proposal was rejected by vote',
+            ],
+        ];
+    }
+
+    /**
+     * Fires a poll outcome on all three channels (news + bell + group chat). The
+     * vote is a collective decision (no single actor), so everyone in the group
+     * is notified. Resolved lazily (`app(...)`) to avoid the MessageService ↔
+     * GroupEventService constructor cycle. Called OUTSIDE the settlement
+     * transaction — notifyGroupEvent is itself fail-soft per channel.
+     */
+    private function firePollAnnouncement(array $announcement): void
+    {
+        $group = Group::find($announcement['groupId']);
         if (! $group) {
             return;
         }
-        $suffix = $description ? (': ' . $description) : '';
         app(\App\Services\GroupEventService::class)->notifyGroupEvent(
             $group,
             'law_changed',
-            title: ['ar' => 'تغيير في القوانين', 'en' => 'Law changed'],
-            body: ['ar' => $ar . $suffix, 'en' => $en . $suffix],
+            title: $announcement['title'],
+            body: $announcement['body'],
             actor: null,
         );
     }

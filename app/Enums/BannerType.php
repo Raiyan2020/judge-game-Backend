@@ -10,6 +10,9 @@ enum BannerType: string
     /** Banners shown on the app news screen. */
     case NEWS = 'news';
 
+    /** Banners shown on the app ranking (leaderboard) screen. */
+    case RANKING = 'ranking';
+
     /**
      * Translated label used by the dashboard (list column, form select, show page).
      */
@@ -18,6 +21,7 @@ enum BannerType: string
         return match ($this) {
             self::HOME => __('home banner'),
             self::NEWS => __('news banner'),
+            self::RANKING => __('ranking banner'),
         };
     }
 

@@ -22,5 +22,33 @@ class SettingSeeder extends Seeder
                 'title' => 'Dashboard Logo',
             ],
         );
+
+        Setting::updateOrCreate(
+            ['name' => 'quick_services'],
+            [
+                'type' => 'text',
+                'value' => [
+                    'en' => '',
+                    'ar' => '',
+                ],
+                'page' => 'الخدمات السريعة',
+                'slug' => 'quick-services',
+                'title' => 'الخدمات السريعة',
+            ],
+        );
+
+        Setting::updateOrCreate(
+            ['name' => 'offers'],
+            [
+                'type' => 'text',
+                'value' => [
+                    'en' => '',
+                    'ar' => '',
+                ],
+                'page' => 'العروض',
+                'slug' => 'offers',
+                'title' => 'العروض',
+            ],
+        );
     }
 }

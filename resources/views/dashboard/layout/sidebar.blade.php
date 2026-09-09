@@ -115,7 +115,7 @@
             <li class="nav-item {{ request()->is('dashboard/settings*') ? 'active' : '' }}">
                 <a href="{{ route('admin.settings.index') }}">
                     <i class="feather icon-settings"></i>
-                    <span class="menu-title">{{ __('settings') }}</span>
+                    <span class="menu-title">{{ __('quick services') }}</span>
                 </a>
             </li>
 

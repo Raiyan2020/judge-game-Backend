@@ -112,11 +112,24 @@
                     <span class="menu-title">{{ __('contact us') }}</span>
                 </a>
             </li>
-            <li class="nav-item {{ request()->is('dashboard/settings*') ? 'active' : '' }}">
-                <a href="{{ route('admin.settings.index') }}">
+            <li class="nav-item has-sub {{ request()->is('dashboard/settings*') ? 'active open' : '' }}">
+                <a href="javascript:void(0)">
                     <i class="feather icon-settings"></i>
                     <span class="menu-title">{{ __('quick services') }}</span>
                 </a>
+                <ul class="menu-content">
+                    <li class="{{ request()->routeIs('admin.settings.index') ? 'active' : '' }}">
+                        <a class="menu-item" href="{{ route('admin.settings.index') }}">{{ __('all sections') }}</a>
+                    </li>
+                    {{-- Same list the settings index table renders (unique `page`
+                        values), so any section added to SettingSeeder shows up
+                        here automatically — e.g. آخر الأخبار. --}}
+                    @foreach (\App\Models\Setting::query()->pluck('page')->unique() as $settingsPage)
+                        <li class="{{ request()->routeIs('admin.settings.show') && request()->route('setting') == $settingsPage ? 'active' : '' }}">
+                            <a class="menu-item" href="{{ route('admin.settings.show', $settingsPage) }}">{{ __($settingsPage) }}</a>
+                        </li>
+                    @endforeach
+                </ul>
             </li>
 
             <form method="POST" action="{{ route('admin.logout') }}" id="logout-form">

@@ -22,14 +22,11 @@ class LegalCaseService
         // Lazily settle any full-distance cases before listing, so `execution`
         // cases that finished their enforcement window show as `closed`, and
         // un-appealed first-instance verdicts past the 24h window read as upheld
-        // and closed (BUG9).
-        $this->repo->closeExpiredExecutionCases($groupId);
+        // and closed (BUG9). The execution close also fires a `case_closed`
+        // group event per closed case (news + bell to parties + chat).
+        $this->closeExpiredExecutionCasesWithEvents($groupId);
         $this->judgmentService->upholdExpiredFirstInstanceCases($groupId);
         $filters['group_id'] = $groupId;
-        // Pass the caller's id so the repository can scope `pending_lawyer` cases
-        // to the assigned plaintiff lawyer only (they are invisible to everyone
-        // else until officially filed).
-        $filters['current_user_id'] = auth()->id();
         return $this->repo->index($filters);
     }
 
@@ -44,12 +41,68 @@ class LegalCaseService
         // the window reads as upheld and closed.
         $this->judgmentService->upholdExpiredFirstInstanceCases($legalCase->group_id);
 
-        // A case that finished its execution window should read as `closed`.
+        // A case that finished its execution window should read as `closed` —
+        // and each such closure fires a `case_closed` group event.
         if ($legalCase->status === \App\Enums\LegalCaseStatus::EXECUTION->value) {
-            $this->repo->closeExpiredExecutionCases($legalCase->group_id);
+            $this->closeExpiredExecutionCasesWithEvents($legalCase->group_id);
         }
 
         $legalCase->refresh();
+    }
+
+    /**
+     * Close every execution case past its 7-day enforcement window AND announce
+     * each closure with a `case_closed` group event (news group-wide + bell to
+     * the case parties + chat). Enumerates the eligible set FIRST because the
+     * repo's bulk UPDATE would close siblings silently. Fail-soft per case.
+     *
+     * NOTE: `getCasesStatus()` (pure counters) and the scheduled
+     * `CloseExpiredExecutionCases` job still bulk-close without events — the
+     * user-facing read paths (list + detail) and the manual close carry the
+     * announcement, which is where it matters.
+     */
+    private function closeExpiredExecutionCasesWithEvents($groupId = null): void
+    {
+        $cases = $this->repo->expiredExecutionCases($groupId);
+        foreach ($cases as $case) {
+            $case->update(['status' => LegalCaseStatus::CLOSED->value]);
+            $this->fireCaseClosedEvent($case);
+        }
+    }
+
+    /**
+     * Announce a case closure on all three channels: the news row stays
+     * group-wide, the bell is scoped to the case parties (not the whole group).
+     * Fail-soft — notifyGroupEvent is itself per-channel fail-soft, and a null
+     * group short-circuits.
+     */
+    private function fireCaseClosedEvent($legalCase): void
+    {
+        $group = $legalCase->group;
+        if (! $group) {
+            return;
+        }
+
+        $parties = User::whereIn(
+            'id',
+            $legalCase->participants()->pluck('user_id')->unique()->filter()
+        )->get();
+
+        $this->events->notifyGroupEvent(
+            $group,
+            'case_closed',
+            title: ['ar' => 'إغلاق القضية', 'en' => 'Case closed'],
+            body: [
+                'ar' => 'تم إغلاق القضية: ' . $legalCase->title,
+                'en' => 'The case has been closed: ' . $legalCase->title,
+            ],
+            actor: null,
+            caseId: $legalCase->id,
+            // Parties-only bell; an empty collection means no bell, while the
+            // news row is still written group-wide (do NOT fall back to null,
+            // which would fan the bell to the entire group).
+            notifiables: $parties,
+        );
     }
 
     /**
@@ -81,6 +134,9 @@ class LegalCaseService
 
         $legalCase->update(['status' => LegalCaseStatus::CLOSED->value]);
         $legalCase->refresh();
+
+        // Announce the closure (news group-wide + bell to the parties + chat).
+        $this->fireCaseClosedEvent($legalCase);
 
         return $legalCase;
     }
@@ -134,11 +190,15 @@ class LegalCaseService
             throw ValidationException::withMessages([$missingMessage]);
         }
 
-        // The judge acting on the case moves it from `new` to `in_progress`
-        // ("being heard, pre-ruling"). Judge-only write — this method is already
-        // judge-authorized above. Idempotent: a no-op once past `new`, and it
-        // never touches `ongoing`/`appeal`/etc.
-        $this->promoteToInProgressIfNew($legalCase);
+        $body = $isConsultant
+            ? [
+                'ar' => 'يطلب القاضي تقديم رأيك الاستشاري في القضية رقم ' . $legalCase->id,
+                'en' => 'The judge requests your consultant opinion on case number ' . $legalCase->id,
+            ]
+            : [
+                'ar' => 'يطلب القاضي تقديم مرافعتك في القضية رقم ' . $legalCase->id,
+                'en' => 'The judge requests your defense opinion on case number ' . $legalCase->id,
+            ];
 
         // Send the nudge. FcmService swallows its own errors (logs and returns),
         // so the FCM leg never throws; the database notification is the durable
@@ -150,17 +210,19 @@ class LegalCaseService
             'title' => $isConsultant
                 ? ['ar' => 'طلب رأي استشاري', 'en' => 'Consultant opinion requested']
                 : ['ar' => 'طلب مرافعة الدفاع', 'en' => 'Defense opinion requested'],
-            'body' => $isConsultant
-                ? [
-                    'ar' => 'يطلب القاضي تقديم رأيك الاستشاري في القضية رقم ' . $legalCase->id,
-                    'en' => 'The judge requests your consultant opinion on case number ' . $legalCase->id,
-                ]
-                : [
-                    'ar' => 'يطلب القاضي تقديم مرافعتك في القضية رقم ' . $legalCase->id,
-                    'en' => 'The judge requests your defense opinion on case number ' . $legalCase->id,
-                ],
+            'body' => $body,
             'type' => $isConsultant ? 'opinion_requested_consultant' : 'opinion_requested_defense',
         ]));
+
+        // Also write a group news row (bell above stays targeted at the nudged
+        // party). The body is a complete sentence, so LegalCaseNews::generateContent
+        // renders it via its `default` branch. Fail-soft — a news failure must
+        // never fail the nudge, whose durable payload is the notification above.
+        try {
+            $this->repo->createCaseNews($legalCase, 'opinion_requested', $body, $userId, null);
+        } catch (\Throwable $e) {
+            logger()->warning('Opinion-request news failed: ' . $e->getMessage());
+        }
 
         return __('The opinion request has been sent');
     }
@@ -180,36 +242,12 @@ class LegalCaseService
             throw ValidationException::withMessages([__('You are not authorized to perform this action')]);
         }
 
-        // A hearing may only be scheduled while the case is actually being heard
-        // (`new` / `in_progress`). This blocks a hearing on a `pending_lawyer`
-        // case — whose title/parties are hidden from the group until it is
-        // officially filed, so a hearing + group-chat post + notifications would
-        // LEAK the held case — and on already-ruled `ongoing`/`appeal`/
-        // `execution`/`closed` cases (matching the app hiding the button
-        // post-ruling). Appeal-stage hearings are intentionally out of scope.
-        if (! in_array($legalCase->status, [
-            LegalCaseStatus::NEW->value,
-            LegalCaseStatus::IN_PROGRESS->value,
-        ], true)) {
-            throw ValidationException::withMessages([
-                __('A hearing can only be scheduled for a case that is being heard'),
-            ]);
-        }
-
         $hearing = $legalCase->hearings()->create([
             'room_id' => $data['room_id'] ?? null,
             'created_by' => $userId,
             'scheduled_at' => $data['scheduled_at'],
             'status' => 'scheduled',
         ]);
-
-        // Hearing creation stays open to any party (above), but the case only
-        // advances `new → in_progress` when the JUDGE schedules it — a lawyer
-        // scheduling a hearing creates the hearing without moving the case.
-        // Idempotent and never touches later stages.
-        if ($this->isCaseJudge($legalCase, (int) $userId)) {
-            $this->promoteToInProgressIfNew($legalCase);
-        }
 
         // No transaction here, so notify inline (try/catch so a failed FCM/DB
         // notification never fails the scheduling itself).
@@ -222,6 +260,12 @@ class LegalCaseService
                     'تم تحديد جلسة في قضية: ' . $legalCase->title,
                 );
             }
+            // Also write a group news row (the bell above stays targeted at the
+            // parties). Complete-sentence content → generateContent `default`.
+            $this->repo->createCaseNews($legalCase, 'hearing_scheduled', [
+                'ar' => 'تم تحديد موعد جلسة للقضية رقم ' . $legalCase->id,
+                'en' => 'A hearing has been scheduled for case #' . $legalCase->id,
+            ], $userId, null);
         } catch (\Throwable $e) {
             logger()->warning('Hearing notification failed: ' . $e->getMessage());
         }
@@ -253,33 +297,6 @@ class LegalCaseService
             ],
             'type' => 'hearing_scheduled',
         ]));
-    }
-
-    /**
-     * Is [$userId] the presiding judge of this case — the group owner OR the
-     * attached `judge` participant? Mirrors the check requestOpinion makes
-     * inline; used to gate the judge-only status write in scheduleHearing.
-     */
-    private function isCaseJudge($legalCase, int $userId): bool
-    {
-        $isOwner = $legalCase->group && (int) $legalCase->group->user_id === $userId;
-        $isJudgeParticipant = $legalCase->judge && (int) $legalCase->judge->user_id === $userId;
-
-        return $isOwner || $isJudgeParticipant;
-    }
-
-    /**
-     * Advance a case from `new` to `in_progress` ("being heard, pre-ruling").
-     * Idempotent: only ever acts when the status is literally `new`, so it is a
-     * no-op once the case has moved on and NEVER pulls a later stage
-     * (`ongoing`/`appeal`/`execution`/`closed`) backwards.
-     */
-    private function promoteToInProgressIfNew($legalCase): void
-    {
-        if ($legalCase->status === LegalCaseStatus::NEW->value) {
-            $legalCase->update(['status' => LegalCaseStatus::IN_PROGRESS->value]);
-            $legalCase->refresh();
-        }
     }
 
 
@@ -324,14 +341,6 @@ class LegalCaseService
                 }
             }
 
-            // The case is HELD with the plaintiff lawyer until they officially
-            // file it (= write their opinion). Set `pending_lawyer` EXPLICITLY —
-            // the DB default is `new`, which would leak the case straight into
-            // the group before the lawyer files. The transition to `new`, and
-            // the deferred case-filed effects (news + chat + judge/defendant
-            // notifications), happen in LegalCaseOpinionServices::createOpinion.
-            $request['status'] = LegalCaseStatus::PENDING_LAWYER->value;
-
             $legalCase = $this->repo->create($request);
             $attachments = $this->collectAttachments($request);
             $this->uploadAttachments($legalCase, $attachments);
@@ -346,6 +355,7 @@ class LegalCaseService
 
             $legalCase->participants()->createMany($participants);
             $legalCase->groupLaws()->attach($request['group_law_ids']);
+            $this->createCaseNews($legalCase, $userId, $participants);
 
             // Credit the plaintiff for filing — the citizen points the profile
             // shows and the post-filing "reward" popup promises. Idempotent per
@@ -357,18 +367,17 @@ class LegalCaseService
             // runs synchronously (no queue worker here), so any throw would
             // propagate out of create() and 500 an already-committed case. The
             // try/catch keeps a failed notification from doing that.
-            // Only the plaintiff-lawyer assignment fires at creation now (type
-            // `plaintiff_lawyer_assign`, routing them to the intake screen). The
-            // judge/defendant "case filed" notifications, the news entry and the
-            // group-chat post are DEFERRED to official filing — see
-            // fireCaseFiledEffects, called from createOpinion once the plaintiff
-            // lawyer files. Until then the case is invisible to everyone but the
-            // plaintiff side.
-            DB::afterCommit(function () use ($legalCase) {
+            DB::afterCommit(function () use ($legalCase, $group, $participants) {
                 try {
                     $this->sendNotificationToPlaintiffLawyer($legalCase);
+                    $this->sendCaseFiledNotifications($legalCase, $group, $participants);
+                    // Mirror into the group chat (bell + news already sent above).
+                    $this->events->postChat(
+                        $group,
+                        'تم رفع قضية جديدة: ' . $legalCase->title,
+                    );
                 } catch (\Throwable $e) {
-                    logger()->warning('Plaintiff-lawyer notification failed: ' . $e->getMessage());
+                    logger()->warning('Case-filed notification failed: ' . $e->getMessage());
                 }
             });
 
@@ -381,46 +390,20 @@ class LegalCaseService
         }
     }
 
-    /**
-     * The "case officially filed" side effects, DEFERRED out of create() until
-     * the plaintiff lawyer files their opinion (Part 2). Called from
-     * LegalCaseOpinionServices::createOpinion on the `pending_lawyer → new`
-     * transition, inside its DB::afterCommit. Fires the news feed entry, the
-     * judge/defendant "case filed" bell notifications, and the group-chat post.
-     *
-     * Fail-soft (self-contained try/catch): this runs after the opinion has
-     * already committed, so a failed notification must never bubble out and 500
-     * an already-filed case.
-     */
-    public function fireCaseFiledEffects($legalCase): void
+    private function createCaseNews($legalCase, $userId, $participants)
     {
-        try {
-            $group = $legalCase->group;
-            if (! $group) {
-                return;
+        $defendant = null;
+        foreach ($participants as $participant) {
+            if ($participant['role'] == 'defendant') {
+                $defendant = $participant['user_id'];
+                break;
             }
-
-            // News feed entry (actor = filer, subject = defendant) — was created
-            // at creation time; the filer is stored on the case as `user_id`.
-            $defendantUserId = $legalCase->defendant?->user_id;
-            if ($defendantUserId) {
-                $this->repo->createCaseNews($legalCase, 'case_created', [
-                    'ar' => 'تم إنشاء القضية',
-                    'en' => 'Legal case created',
-                ], $legalCase->user_id, $defendantUserId);
-            }
-
-            // Bell notifications: defendant (filed against you) + judge (filed in
-            // your group).
-            $this->sendCaseFiledNotifications($legalCase, $group);
-
-            // Group-chat mirror.
-            $this->events->postChat(
-                $group,
-                'تم رفع قضية جديدة: ' . $legalCase->title,
-            );
-        } catch (\Throwable $e) {
-            logger()->warning('Case-filed effects failed: ' . $e->getMessage());
+        }
+        if ($defendant) {
+            $this->repo->createCaseNews($legalCase, 'case_created', [
+                'ar' => 'تم إنشاء القضية',
+                'en' => 'Legal case created',
+            ], $userId, $defendant);
         }
     }
 
@@ -535,17 +518,13 @@ class LegalCaseService
         }
 
         // Assignable while the case is still open at first instance (new /
-        // in_progress / ongoing) OR under APPEAL — a convicted defendant who had
-        // no lawyer must be able to appoint one to defend the appeal (C1).
-        // `in_progress` is first-instance too (a hearing was scheduled), so the
-        // defendant can still appoint counsel there. Only execution / closed are
-        // too late. (`pending_lawyer` never reaches here: the defendant cannot
-        // yet see a case that has not been officially filed.)
+        // ongoing) OR under APPEAL — a convicted defendant who had no lawyer must
+        // be able to appoint one to defend the appeal (C1). Only execution /
+        // closed are too late.
         if (! in_array(
             $case->status,
             [
                 LegalCaseStatus::NEW->value,
-                LegalCaseStatus::IN_PROGRESS->value,
                 LegalCaseStatus::ONGOING->value,
                 LegalCaseStatus::APPEAL->value,
             ],
@@ -638,29 +617,35 @@ class LegalCaseService
      * Notify the two parties a filing must reach but previously did not: the
      * DEFENDANT (a case was filed against them) and the group's JUDGE (a case
      * was filed in their court). Only the plaintiff lawyer was ever notified.
-     * The defendant is read from the case's `defendant` party relation; the
-     * judge is the group owner (attached as the `judge` participant via
-     * `$group->user_id`).
+     * The defendant id is read from the participants array; the judge is the
+     * group owner (attached as the `judge` participant via `$group->user_id`).
      */
-    private function sendCaseFiledNotifications($legalCase, $group): void
+    private function sendCaseFiledNotifications($legalCase, $group, array $participants): void
     {
-        // Read the defendant from the case's `defendant` party relation (this
-        // now runs at official-filing time, not creation, so there is no
-        // in-memory participants array to walk).
-        $defendant = $legalCase->defendant?->user;
-        if ($defendant) {
-            Notification::send($defendant, new LegalCaseNotification($legalCase, [
-                'model_id' => $legalCase->id,
-                'title' => [
-                    'ar' => 'قضية جديدة مرفوعة ضدك',
-                    'en' => 'A new case filed against you',
-                ],
-                'body' => [
-                    'ar' => 'تم رفع قضية جديدة ضدك برقم ' . $legalCase->id,
-                    'en' => 'A new case (#' . $legalCase->id . ') has been filed against you',
-                ],
-                'type' => 'case_filed_against_you',
-            ]));
+        $defendantId = null;
+        foreach ($participants as $participant) {
+            if (($participant['role'] ?? null) === 'defendant') {
+                $defendantId = $participant['user_id'];
+                break;
+            }
+        }
+
+        if ($defendantId) {
+            $defendant = User::find($defendantId);
+            if ($defendant) {
+                Notification::send($defendant, new LegalCaseNotification($legalCase, [
+                    'model_id' => $legalCase->id,
+                    'title' => [
+                        'ar' => 'قضية جديدة مرفوعة ضدك',
+                        'en' => 'A new case filed against you',
+                    ],
+                    'body' => [
+                        'ar' => 'تم رفع قضية جديدة ضدك برقم ' . $legalCase->id,
+                        'en' => 'A new case (#' . $legalCase->id . ') has been filed against you',
+                    ],
+                    'type' => 'case_filed_against_you',
+                ]));
+            }
         }
 
         $judge = User::find($group->user_id);
@@ -684,9 +669,6 @@ class LegalCaseService
     {
         // Settle finished execution cases first so the counters are honest.
         $this->repo->closeExpiredExecutionCases($groupId);
-        // Pass the caller's id through: the `pending_lawyer` counter is
-        // user-scoped (only the assigned plaintiff lawyer's «بانتظار رفعي»
-        // cases), unlike the group-wide status tallies.
-        return $this->repo->getCasesStatus($groupId, auth()->id());
+        return $this->repo->getCasesStatus($groupId);
     }
 }

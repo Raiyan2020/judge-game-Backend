@@ -49,21 +49,6 @@ class LegalCaseJudgmentService
 
             $this->ensureUserIsJudge($legalCase);
             $this->ensureCaseIsNotClosed($legalCase);
-
-            // A `pending_lawyer` case is not yet officially filed — the plaintiff
-            // lawyer has not filed their opinion, so there is nothing to rule on.
-            // Ruling here would jump the case to `ongoing` and permanently strip
-            // its official-filing transition (the deferred news/chat/case-filed
-            // notifications would never fire and a later plaintiff-lawyer opinion
-            // would resolve to the appeal stage). Unreachable through the app
-            // (the judge cannot see or list a pending case), but guarded here as
-            // the only lifecycle mutator without a status gate.
-            if ($legalCase->status === LegalCaseStatus::PENDING_LAWYER->value) {
-                throw ValidationException::withMessages([
-                    'legal_case_id' => __('This case has not been officially filed yet'),
-                ]);
-            }
-
             $isFinal = in_array($data['judgment_type'], [LegalCaseJudgmentType::DISMISSED->value, LegalCaseJudgmentType::ACQUITTAL->value]);
 
             if ($this->judgmentRepo->hasStageForCase($legalCase->id, LegalCaseJudgmentStage::FIRST_INSTANCE->value)) {
@@ -156,6 +141,26 @@ class LegalCaseJudgmentService
 
             $this->createFinalJudgmentNews($legalCase, $judgment);
             $this->postCaseChat($legalCase, 'صدر الحكم النهائي في قضية');
+
+            // The case has now entered ENFORCEMENT — announce that lifecycle
+            // milestone on all three channels (news group-wide, bell to the case
+            // parties). Distinct from the final-judgment news above (verdict
+            // issued vs. case now under execution). Group-guarded.
+            if ($legalCase->group) {
+                $parties = User::whereIn('id', $this->getJudgmentRecipients($legalCase))->get();
+                $this->events->notifyGroupEvent(
+                    $legalCase->group,
+                    'case_execution',
+                    title: ['ar' => 'تنفيذ الحكم', 'en' => 'Judgment execution'],
+                    body: [
+                        'ar' => 'دخلت القضية مرحلة التنفيذ: ' . $legalCase->title,
+                        'en' => 'The case entered the execution stage: ' . $legalCase->title,
+                    ],
+                    actor: null,
+                    caseId: $legalCase->id,
+                    notifiables: $parties,
+                );
+            }
 
             // Award role points for the appeal (final) ruling.
             $this->points->onFinalJudgment($legalCase, $data['judgment_type']);

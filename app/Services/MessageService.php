@@ -216,6 +216,28 @@ class MessageService
             \Log::warning('Broadcast MessageSent failed: ' . $e->getMessage());
         }
 
+        // Notify the recipient so a PRIVATE message actually surfaces (bell +
+        // FCM) — the tester's complaint was that broadcast-only left the
+        // recipient with nothing. Group chats are a shared realtime timeline
+        // (everyone already sees the broadcast), so they are intentionally left
+        // to the broadcast alone to avoid a bell on every group message.
+        // Fail-soft: the message is already persisted.
+        try {
+            if (! ($data['group_id'] ?? null)) {
+                $recipients = $chat->users()
+                    ->where('users.id', '!=', $userId)
+                    ->get();
+                if ($recipients->isNotEmpty()) {
+                    \Illuminate\Support\Facades\Notification::send(
+                        $recipients,
+                        new \App\Notifications\NewMessageNotification($message)
+                    );
+                }
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Message notification failed: ' . $e->getMessage());
+        }
+
         return $message;
     }
 

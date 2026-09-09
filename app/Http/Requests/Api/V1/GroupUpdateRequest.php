@@ -23,14 +23,13 @@ class GroupUpdateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // Same per-owner uniqueness as create, but ignoring THIS group so a
+            // Same global uniqueness as create, but ignoring THIS group so a
             // no-op save (or an image-only edit) doesn't collide with itself.
             'name' => [
                 'sometimes',
                 'string',
                 'max:255',
                 Rule::unique('groups', 'name')
-                    ->where(fn ($query) => $query->where('user_id', auth()->id()))
                     ->ignore($this->route('group')),
             ],
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
@@ -43,7 +42,7 @@ class GroupUpdateRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'name.unique' => __('You already have a group with this name'),
+            'name.unique' => __('This group name is already taken.'),
         ];
     }
 }

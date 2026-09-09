@@ -30,21 +30,26 @@ class NewMessageNotification extends Notification
     {
         return [
             'message_id' => $this->message->id,
-            'sender_name' => $this->message->user->name,
-            'content' => $this->message->content,
-            'type' => $this->message->type,
-            'group_id' => $this->message->group_id,
+            'sender_name' => $this->message->user?->name,
+            // Read the real DB column. There is no `content` column on
+            // chat_messages (the body lives in `message`), so the old read
+            // returned null and the bell/push body was blank. Key stays
+            // `content` because FcmChannel::titleBody uses it as the body
+            // fallback.
+            'content' => $this->message->message,
+            // The client's push router keys on 'message'/'chat'. The raw
+            // ChatMessage `type` is 'text'/'private' and routed nowhere.
+            'type' => 'message',
+            // Deep-link target: the CHAT id, so tapping opens
+            // privateChatDetail(id). FcmChannel builds `related_data` from
+            // group_id ?? model_id ?? id, so exposing the chat id as model_id
+            // (and no group_id) makes the push land on the private chat.
+            'model_id' => $this->message->chat_id,
         ];
     }
 
     public function toBroadcast(object $notifiable): array
     {
-        return [
-            'message_id' => $this->message->id,
-            'sender_name' => $this->message->user?->name,
-            'content' => $this->message->content,
-            'type' => $this->message->type,
-            'group_id' => $this->message->group_id,
-        ];
+        return $this->toArray($notifiable);
     }
 }

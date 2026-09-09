@@ -23,16 +23,14 @@ class GroupRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // Unique PER OWNER: a user may not create two groups with the same
-            // name (the app used to allow "الديوانية" twice). Global uniqueness
-            // would wrongly collide across unrelated users.
+            // Unique GLOBALLY: no two groups anywhere may share a name (the
+            // tester wants group names to be a global namespace), so a plain
+            // unique on `name` with no per-owner scoping.
             'name' => [
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('groups', 'name')->where(
-                    fn ($query) => $query->where('user_id', auth()->id())
-                ),
+                Rule::unique('groups', 'name'),
             ],
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'description' => 'nullable|string',
@@ -45,7 +43,7 @@ class GroupRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'name.unique' => __('You already have a group with this name'),
+            'name.unique' => __('This group name is already taken.'),
         ];
     }
 }

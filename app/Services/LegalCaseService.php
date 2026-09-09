@@ -22,8 +22,9 @@ class LegalCaseService
         // Lazily settle any full-distance cases before listing, so `execution`
         // cases that finished their enforcement window show as `closed`, and
         // un-appealed first-instance verdicts past the 24h window read as upheld
-        // and closed (BUG9).
-        $this->repo->closeExpiredExecutionCases($groupId);
+        // and closed (BUG9). The execution close also fires a `case_closed`
+        // group event per closed case (news + bell to parties + chat).
+        $this->closeExpiredExecutionCasesWithEvents($groupId);
         $this->judgmentService->upholdExpiredFirstInstanceCases($groupId);
         $filters['group_id'] = $groupId;
         return $this->repo->index($filters);
@@ -40,12 +41,68 @@ class LegalCaseService
         // the window reads as upheld and closed.
         $this->judgmentService->upholdExpiredFirstInstanceCases($legalCase->group_id);
 
-        // A case that finished its execution window should read as `closed`.
+        // A case that finished its execution window should read as `closed` —
+        // and each such closure fires a `case_closed` group event.
         if ($legalCase->status === \App\Enums\LegalCaseStatus::EXECUTION->value) {
-            $this->repo->closeExpiredExecutionCases($legalCase->group_id);
+            $this->closeExpiredExecutionCasesWithEvents($legalCase->group_id);
         }
 
         $legalCase->refresh();
+    }
+
+    /**
+     * Close every execution case past its 7-day enforcement window AND announce
+     * each closure with a `case_closed` group event (news group-wide + bell to
+     * the case parties + chat). Enumerates the eligible set FIRST because the
+     * repo's bulk UPDATE would close siblings silently. Fail-soft per case.
+     *
+     * NOTE: `getCasesStatus()` (pure counters) and the scheduled
+     * `CloseExpiredExecutionCases` job still bulk-close without events — the
+     * user-facing read paths (list + detail) and the manual close carry the
+     * announcement, which is where it matters.
+     */
+    private function closeExpiredExecutionCasesWithEvents($groupId = null): void
+    {
+        $cases = $this->repo->expiredExecutionCases($groupId);
+        foreach ($cases as $case) {
+            $case->update(['status' => LegalCaseStatus::CLOSED->value]);
+            $this->fireCaseClosedEvent($case);
+        }
+    }
+
+    /**
+     * Announce a case closure on all three channels: the news row stays
+     * group-wide, the bell is scoped to the case parties (not the whole group).
+     * Fail-soft — notifyGroupEvent is itself per-channel fail-soft, and a null
+     * group short-circuits.
+     */
+    private function fireCaseClosedEvent($legalCase): void
+    {
+        $group = $legalCase->group;
+        if (! $group) {
+            return;
+        }
+
+        $parties = User::whereIn(
+            'id',
+            $legalCase->participants()->pluck('user_id')->unique()->filter()
+        )->get();
+
+        $this->events->notifyGroupEvent(
+            $group,
+            'case_closed',
+            title: ['ar' => 'إغلاق القضية', 'en' => 'Case closed'],
+            body: [
+                'ar' => 'تم إغلاق القضية: ' . $legalCase->title,
+                'en' => 'The case has been closed: ' . $legalCase->title,
+            ],
+            actor: null,
+            caseId: $legalCase->id,
+            // Parties-only bell; an empty collection means no bell, while the
+            // news row is still written group-wide (do NOT fall back to null,
+            // which would fan the bell to the entire group).
+            notifiables: $parties,
+        );
     }
 
     /**
@@ -77,6 +134,9 @@ class LegalCaseService
 
         $legalCase->update(['status' => LegalCaseStatus::CLOSED->value]);
         $legalCase->refresh();
+
+        // Announce the closure (news group-wide + bell to the parties + chat).
+        $this->fireCaseClosedEvent($legalCase);
 
         return $legalCase;
     }
@@ -130,6 +190,16 @@ class LegalCaseService
             throw ValidationException::withMessages([$missingMessage]);
         }
 
+        $body = $isConsultant
+            ? [
+                'ar' => 'يطلب القاضي تقديم رأيك الاستشاري في القضية رقم ' . $legalCase->id,
+                'en' => 'The judge requests your consultant opinion on case number ' . $legalCase->id,
+            ]
+            : [
+                'ar' => 'يطلب القاضي تقديم مرافعتك في القضية رقم ' . $legalCase->id,
+                'en' => 'The judge requests your defense opinion on case number ' . $legalCase->id,
+            ];
+
         // Send the nudge. FcmService swallows its own errors (logs and returns),
         // so the FCM leg never throws; the database notification is the durable
         // record AND the entire payload of this endpoint, so it is deliberately
@@ -140,17 +210,19 @@ class LegalCaseService
             'title' => $isConsultant
                 ? ['ar' => 'طلب رأي استشاري', 'en' => 'Consultant opinion requested']
                 : ['ar' => 'طلب مرافعة الدفاع', 'en' => 'Defense opinion requested'],
-            'body' => $isConsultant
-                ? [
-                    'ar' => 'يطلب القاضي تقديم رأيك الاستشاري في القضية رقم ' . $legalCase->id,
-                    'en' => 'The judge requests your consultant opinion on case number ' . $legalCase->id,
-                ]
-                : [
-                    'ar' => 'يطلب القاضي تقديم مرافعتك في القضية رقم ' . $legalCase->id,
-                    'en' => 'The judge requests your defense opinion on case number ' . $legalCase->id,
-                ],
+            'body' => $body,
             'type' => $isConsultant ? 'opinion_requested_consultant' : 'opinion_requested_defense',
         ]));
+
+        // Also write a group news row (bell above stays targeted at the nudged
+        // party). The body is a complete sentence, so LegalCaseNews::generateContent
+        // renders it via its `default` branch. Fail-soft — a news failure must
+        // never fail the nudge, whose durable payload is the notification above.
+        try {
+            $this->repo->createCaseNews($legalCase, 'opinion_requested', $body, $userId, null);
+        } catch (\Throwable $e) {
+            logger()->warning('Opinion-request news failed: ' . $e->getMessage());
+        }
 
         return __('The opinion request has been sent');
     }
@@ -188,6 +260,12 @@ class LegalCaseService
                     'تم تحديد جلسة في قضية: ' . $legalCase->title,
                 );
             }
+            // Also write a group news row (the bell above stays targeted at the
+            // parties). Complete-sentence content → generateContent `default`.
+            $this->repo->createCaseNews($legalCase, 'hearing_scheduled', [
+                'ar' => 'تم تحديد موعد جلسة للقضية رقم ' . $legalCase->id,
+                'en' => 'A hearing has been scheduled for case #' . $legalCase->id,
+            ], $userId, null);
         } catch (\Throwable $e) {
             logger()->warning('Hearing notification failed: ' . $e->getMessage());
         }

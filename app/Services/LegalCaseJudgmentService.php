@@ -142,6 +142,26 @@ class LegalCaseJudgmentService
             $this->createFinalJudgmentNews($legalCase, $judgment);
             $this->postCaseChat($legalCase, 'صدر الحكم النهائي في قضية');
 
+            // The case has now entered ENFORCEMENT — announce that lifecycle
+            // milestone on all three channels (news group-wide, bell to the case
+            // parties). Distinct from the final-judgment news above (verdict
+            // issued vs. case now under execution). Group-guarded.
+            if ($legalCase->group) {
+                $parties = User::whereIn('id', $this->getJudgmentRecipients($legalCase))->get();
+                $this->events->notifyGroupEvent(
+                    $legalCase->group,
+                    'case_execution',
+                    title: ['ar' => 'تنفيذ الحكم', 'en' => 'Judgment execution'],
+                    body: [
+                        'ar' => 'دخلت القضية مرحلة التنفيذ: ' . $legalCase->title,
+                        'en' => 'The case entered the execution stage: ' . $legalCase->title,
+                    ],
+                    actor: null,
+                    caseId: $legalCase->id,
+                    notifiables: $parties,
+                );
+            }
+
             // Award role points for the appeal (final) ruling.
             $this->points->onFinalJudgment($legalCase, $data['judgment_type']);
 

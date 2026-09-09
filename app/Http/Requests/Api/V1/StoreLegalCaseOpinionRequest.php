@@ -41,8 +41,9 @@ class StoreLegalCaseOpinionRequest extends FormRequest
             'images.*' => 'image|max:15360',
             'videos' => 'nullable|array',
             // Real-MIME validation so camera clips (quicktime/3gpp) pass;
-            // uniform 15MB cap across all evidence types (JG-030).
-            'videos.*' => 'mimetypes:video/mp4,video/quicktime,video/x-msvideo,video/3gpp,video/x-matroska|max:15360',
+            // video allows up to 50MB (images/audios stay 15MB) — keep
+            // config/media-library.php max_file_size in step (JG-030).
+            'videos.*' => 'mimetypes:video/mp4,video/quicktime,video/x-msvideo,video/3gpp,video/x-matroska|max:51200',
             'audios' => 'nullable|array',
             'audios.*' => 'mimes:mp3,wav,m4a|max:15360',
         ];

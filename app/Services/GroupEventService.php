@@ -30,6 +30,7 @@ class GroupEventService
      * @param  ?User   $actor       who caused the event (excluded from the bell)
      * @param  ?int    $caseId      the case, when the event is case-scoped
      * @param  ?\Illuminate\Support\Collection  $notifiables  override recipients; defaults to accepted members
+     * @param  ?int    $subjectId   the event's subject (e.g. the joining user) so the news row can render/deep-link a name
      */
     public function notifyGroupEvent(
         Group $group,
@@ -39,13 +40,14 @@ class GroupEventService
         ?User $actor = null,
         ?int $caseId = null,
         $notifiables = null,
+        ?int $subjectId = null,
     ): void {
-        $this->pushNews($group, $type, $body, $actor, $caseId);
+        $this->pushNews($group, $type, $body, $actor, $caseId, $subjectId);
         $this->pushBell($group, $type, $title, $body, $actor, $caseId, $notifiables);
         $this->pushChat($group, $body);
     }
 
-    private function pushNews(Group $group, string $type, array $body, ?User $actor, ?int $caseId): void
+    private function pushNews(Group $group, string $type, array $body, ?User $actor, ?int $caseId, ?int $subjectId = null): void
     {
         try {
             LegalCaseNews::create([
@@ -54,6 +56,7 @@ class GroupEventService
                 'group_id' => $group->id,
                 'legal_case_id' => $caseId,
                 'actor_id' => $actor?->id,
+                'subject_id' => $subjectId,
             ]);
         } catch (\Throwable $e) {
             \Log::warning('GroupEvent news failed: ' . $e->getMessage());

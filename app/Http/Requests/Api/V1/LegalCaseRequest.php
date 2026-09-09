@@ -36,9 +36,11 @@ class LegalCaseRequest extends FormRequest
             'videos' => 'nullable|array',
             // Validate by real MIME, not extension: a camera video (iOS
             // video/quicktime .mov, Android video/mp4 / 3gpp) failed `mimes:`
-            // extension-guessing. Uniform 15MB cap across all evidence types.
+            // extension-guessing. Video allows up to 50MB (images/audios stay
+            // 15MB); config/media-library.php max_file_size must match or
+            // Spatie rejects it at store time.
             // (JG-030; also raise php.ini upload_max_filesize/post_max_size.)
-            'videos.*' => 'mimetypes:video/mp4,video/quicktime,video/x-msvideo,video/3gpp,video/x-matroska|max:15360',
+            'videos.*' => 'mimetypes:video/mp4,video/quicktime,video/x-msvideo,video/3gpp,video/x-matroska|max:51200',
             'audios' => 'nullable|array',
             'audios.*' => 'mimetypes:audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/x-m4a,audio/aac|max:15360',
         ];

@@ -78,6 +78,24 @@ class LegalCaseRepository extends BaseRepository
     }
 
     /**
+     * The models eligible for the 7-day execution close ABOVE — same rule,
+     * returned instead of bulk-updated so the service can announce each closure
+     * (a `case_closed` group event) before it flips them. A bulk UPDATE would
+     * close siblings silently: on the next read their status is already CLOSED,
+     * so no event could ever fire for them.
+     */
+    public function expiredExecutionCases($groupId = null)
+    {
+        return $this->model->query()
+            ->where('status', LegalCaseStatus::EXECUTION->value)
+            ->when($groupId, fn ($q) => $q->where('group_id', $groupId))
+            ->whereHas('finalJudgment', function ($query) {
+                $query->where('created_at', '<=', now()->subDays(7));
+            })
+            ->get();
+    }
+
+    /**
      * The auto-uphold window (BUG9, product decision): a first-instance verdict
      * left un-appealed for this long is upheld automatically. Sits beside the
      * 7-day execution window above so both time-based settlement rules live in

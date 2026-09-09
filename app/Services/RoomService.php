@@ -15,7 +15,10 @@ class RoomService
 {
 
 
-    public function __construct(protected RoomRepository $repo) {}
+    public function __construct(
+        protected RoomRepository $repo,
+        protected GroupEventService $events,
+    ) {}
 
     public function index($request = [])
     {
@@ -39,9 +42,19 @@ class RoomService
             $room->users()->attach(auth()->id(), ['is_admin' => true]);
 
 
-            DB::afterCommit(function () use ($invitedUsers, $room, $request) {
+            // Capture the opener now — afterCommit runs synchronously in-request
+            // (no queue worker), so auth() is still available, but reading it
+            // once keeps the announcement's actor stable.
+            $opener = auth()->user();
+            DB::afterCommit(function () use ($invitedUsers, $room, $request, $opener) {
                 if (!empty($invitedUsers) and $request['type'] === 'private') {
                     $this->notifyUsers($invitedUsers, $room, $request['password'] ?? null);
+                }
+                // A PUBLIC room is a group-wide live stream: announce it on all
+                // three channels so the group knows a broadcast started. Private
+                // rooms keep their targeted NewCallNotification (above) untouched.
+                if ($room->type === 'public') {
+                    $this->announcePublicRoom($room, $opener);
                 }
             });
             DB::commit();
@@ -81,6 +94,30 @@ class RoomService
         ];
 
         Notification::send($notifiables, new NewCallNotification($data));
+    }
+
+    /**
+     * Announce that a PUBLIC live stream opened in the group — news + bell +
+     * chat — with the opener as the actor (excluded from the bell). Group-guarded
+     * and fail-soft (notifyGroupEvent is per-channel fail-soft).
+     */
+    private function announcePublicRoom($room, $opener): void
+    {
+        $group = $room->group;
+        if (! $group) {
+            return;
+        }
+
+        $this->events->notifyGroupEvent(
+            $group,
+            'live_stream_started',
+            title: ['ar' => 'بث مباشر', 'en' => 'Live stream'],
+            body: [
+                'ar' => 'بدأ بث مباشر في المجموعة: ' . $room->name,
+                'en' => 'A live stream has started in the group: ' . $room->name,
+            ],
+            actor: $opener,
+        );
     }
 
 

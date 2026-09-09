@@ -135,14 +135,33 @@ class GroupMemberService
            throw ValidationException::withMessages([ __('Pending invitation not found')]);
        }
 
-       // Capture the inviter BEFORE mutating the pivot so the response notice
-       // reaches whoever actually sent the invite (owner is the fallback).
+       // Capture the inviter AND the pivot role BEFORE mutating the pivot so the
+       // response notice reaches whoever actually sent the invite (owner is the
+       // fallback), and the group-wide announcement carries the member's role.
        $inviterId = $pivot->invited_by ?? null;
+       $joinRole = $pivot->role ?? '';
 
        $this->repo->updateGroupMemberStatus($group, $user, 'accepted');
        $group->chat?->users()->attach($user->id);
 
        $this->notifyOwnerOfResponse($group, $user, true, $inviterId);
+
+       // Announce the new member on all three channels (bell + news + chat) so
+       // the whole group learns someone joined — previously nothing fired but
+       // the inviter ping. Actor = the joining user (excluded from the bell,
+       // and set as the news subject for a name/deep-link target).
+       $roleLabel = $this->roleLabels($joinRole);
+       $this->events->notifyGroupEvent(
+           $group,
+           'member_joined',
+           title: ['ar' => 'عضو جديد', 'en' => 'New member'],
+           body: [
+               'ar' => 'انضمّ عضو جديد: ' . $user->name . ' (' . $roleLabel['ar'] . ')',
+               'en' => 'A new member joined: ' . $user->name . ' (' . $roleLabel['en'] . ')',
+           ],
+           actor: $user,
+           subjectId: $user->id,
+       );
 
        return $user;
    }

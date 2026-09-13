@@ -86,15 +86,25 @@ class BannerDataTable extends DataTable
      */
     public function html(): HtmlBuilder
     {
+        // Keep the placement tab (?type=home / ?type=news) on the ajax URL so the
+        // query() scope survives every draw, exactly like the first page load.
+        $type = BannerType::tryFrom((string) request('type'));
+
         return $this->builder()
             ->setTableId('banner-table')
             ->columns($this->getColumns())
-            ->minifiedAjax()
+            // NOT minifiedAjax(): its data callback strips `searchable` and the
+            // per-column `search` payload, which is exactly what the column
+            // filters need to reach filterColumn() on the server.
+            ->ajax(route('admin.banners.index', $type ? ['type' => $type->value] : [], false))
             ->dom('Bfrtip')
             ->orderBy(0)
             ->responsive(true)
             ->selectStyleSingle()
             ->buttons([])
+            ->parameters([
+                'searching' => true,
+            ])
             ->language([
                 'lengthMenu' => '_MENU_',
                 'sProcessing' => __('Loading...'),
@@ -125,7 +135,7 @@ class BannerDataTable extends DataTable
         return [
             Column::computed('DT_RowIndex')->title('#'),
             Column::computed('title')->title(__('title'))->searchable(),
-            Column::make('type')->title(__('banner type')),
+            Column::make('type')->title(__('banner type'))->searchable(),
             Column::computed('image')->title(__('image')),
             Column::computed('status')->title(__('status')),
             Column::computed('action')->title(__('actions')),

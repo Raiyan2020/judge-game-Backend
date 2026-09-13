@@ -50,13 +50,19 @@ class UserDataTable extends DataTable
         return $this->builder()
             ->setTableId('user-table')
             ->columns($this->getColumns())
-            ->minifiedAjax()
+            // NOT minifiedAjax(): its data callback strips `searchable` and the
+            // per-column `search` payload, which is exactly what the column
+            // filters need to reach filterColumn() on the server.
+            ->ajax(route('admin.users.index', [], false))
             ->dom('Bfrtip')
             ->orderBy(0)
             ->responsive(true)
             ->selectStyleSingle()
             ->responsive()
             ->buttons([])
+            ->parameters([
+                'searching' => true,
+            ])
             ->language([
                 'lengthMenu' => '_MENU_',
                 'sProcessing' => __('Loading...'),
@@ -86,9 +92,9 @@ class UserDataTable extends DataTable
     {
         return [
             Column::computed('DT_RowIndex')->title('#'),
-            Column::make('name')->title(__('name')),
-            Column::make('username')->title(__('user name')),
-            Column::make('full_phone')->title(__('phone')),
+            Column::make('name')->title(__('name'))->searchable(),
+            Column::make('username')->title(__('user name'))->searchable(),
+            Column::make('full_phone')->title(__('phone'))->searchable(),
             Column::computed('action')->title(__('actions')),
 
         ];

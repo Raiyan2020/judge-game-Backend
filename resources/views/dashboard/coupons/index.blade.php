@@ -18,7 +18,17 @@
                                     class="btn btn-primary mb-2 waves-effect waves-light">
                                     <i class="fas fa-plus"></i>&nbsp; {{ __('add new') }} 
                                 </a>
-                               
+
+                                @include('dashboard.partials.datatable-filters', [
+                                    'tableId' => 'coupon-table',
+                                    'filters' => [
+                                        ['key' => 'code', 'label' => __('code')],
+                                        ['key' => 'discount', 'label' => __('percentage')],
+                                        ['key' => 'start_at', 'label' => __('start at'), 'placeholder' => 'YYYY-MM-DD'],
+                                        ['key' => 'end_at', 'label' => __('end at'), 'placeholder' => 'YYYY-MM-DD'],
+                                    ],
+                                ])
+
                                 <div class="table-responsive">
                                     {{ $dataTable->table()}}
                                 </div>
@@ -35,6 +45,6 @@
 
 @push('scripts')
     {{$dataTable->scripts()}}
-    <script src="{{asset('voucher/datatables/buttons.server-side.js')  }}"></script>
+    <script src="{{asset('vendor/datatables/buttons.server-side.js')  }}"></script>
 
 @endpush

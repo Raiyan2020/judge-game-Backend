@@ -18,7 +18,14 @@
                                     class="btn btn-primary mb-2 waves-effect waves-light">
                                     <i class="fas fa-plus"></i>&nbsp; {{ __('add new') }} 
                                 </a>
-                               
+
+                                @include('dashboard.partials.datatable-filters', [
+                                    'tableId' => 'tip-table',
+                                    'filters' => [
+                                        ['key' => 'description', 'label' => __('description')],
+                                    ],
+                                ])
+
                                 <div class="table-responsive">
                                     {{ $dataTable->table()}}
                                 </div>

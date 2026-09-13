@@ -63,7 +63,15 @@ class BannerController extends Controller
      */
     public function update(StoreRequest $request, Banner $banner)
     {
-        $this->bannerService->update($banner , $request->validated());
+        $data = $request->validated();
+
+        // An untouched file input is submitted as null: keep the stored image
+        // instead of overwriting it with an empty value.
+        if (! $request->hasFile('image')) {
+            unset($data['image']);
+        }
+
+        $this->bannerService->update($banner , $data);
         updated();
         return redirect()->route('admin.banners.index');
     }

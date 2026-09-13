@@ -13,6 +13,18 @@
                         </div>
                         <div class="card-content">
                             <div class="card-body card-dashboard">
+                                @include('dashboard.partials.datatable-filters', [
+                                    'tableId' => 'package-subscription-table',
+                                    'filters' => [
+                                        ['key' => 'package_name', 'label' => __('packagename')],
+                                        ['key' => 'user_name', 'label' => __('username')],
+                                        ['key' => 'total', 'label' => __('total')],
+                                        ['key' => 'discount', 'label' => __('discount')],
+                                        ['key' => 'starts_at', 'label' => __('starts at')],
+                                        ['key' => 'ends_at', 'label' => __('ends at')],
+                                    ],
+                                ])
+
                                 <div class="table-responsive">
                                     {{ $dataTable->table()}}
                                 </div>

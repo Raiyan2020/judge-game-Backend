@@ -16,6 +16,16 @@
                                 <a href="{{ route('admin.packages.create') }}"
                                     class="btn btn-primary mb-2 waves-effect waves-light">
                                     <i class="fas fa-plus"></i>&nbsp; {{__('add new')}} </a>
+
+                                @include('dashboard.partials.datatable-filters', [
+                                    'tableId' => 'package-table',
+                                    'filters' => [
+                                        ['key' => 'name', 'label' => __('name')],
+                                        ['key' => 'price', 'label' => __('price')],
+                                        ['key' => 'duration_days', 'label' => __('duration in days')],
+                                    ],
+                                ])
+
                                 <div class="table-responsive">
                                     {{ $dataTable->table()}}
                                 </div>

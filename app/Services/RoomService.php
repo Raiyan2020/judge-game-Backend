@@ -47,15 +47,18 @@ class RoomService
             // once keeps the announcement's actor stable.
             $opener = auth()->user();
             DB::afterCommit(function () use ($invitedUsers, $room, $request, $opener) {
-                if (!empty($invitedUsers) and $request['type'] === 'private') {
+                $isPrivate = $room->type === 'private';
+
+                if (!empty($invitedUsers) and $isPrivate) {
                     $this->notifyUsers($invitedUsers, $room, $request['password'] ?? null);
                 }
-                // A PUBLIC room is a group-wide live stream: announce it on all
-                // three channels so the group knows a broadcast started. Private
-                // rooms keep their targeted NewCallNotification (above) untouched.
-                if ($room->type === 'public') {
-                    $this->announcePublicRoom($room, $opener);
-                }
+
+                // EVERY room opening is announced in the group's news feed +
+                // timeline. Previously only a public room announced, so opening a
+                // private stream produced an invite bell and nothing else — the
+                // group never learned a broadcast had started (QA: «فتح بث مباشر»
+                // appeared in notifications but not in الأخبار).
+                $this->announceRoom($room, $opener, $isPrivate);
             });
             DB::commit();
 
@@ -97,26 +100,58 @@ class RoomService
     }
 
     /**
-     * Announce that a PUBLIC live stream opened in the group — news + bell +
-     * chat — with the opener as the actor (excluded from the bell). Group-guarded
-     * and fail-soft (notifyGroupEvent is per-channel fail-soft).
+     * Announce that a live room opened in the group, with the opener as the
+     * actor. Group-guarded and fail-soft (notifyGroupEvent is per-channel
+     * fail-soft).
+     *
+     * PUBLIC: news + bell + chat to the whole group.
+     * PRIVATE: news + chat only — the invitees already got the targeted
+     * [NewCallNotification] (which alone carries the password), so a second
+     * group-wide bell would both double their alert and ping members who were
+     * not invited. An EMPTY notifiables collection is how notifyGroupEvent is
+     * told to skip the bell; the news row still tells the group a stream is on
+     * air. The room password is never part of the copy.
      */
-    private function announcePublicRoom($room, $opener): void
+    private function announceRoom($room, $opener, bool $isPrivate): void
+    {
+        try {
+            $this->fireRoomEvent($room, $opener, $isPrivate);
+        } catch (\Throwable $e) {
+            // Runs in an afterCommit callback: throwing here would reach
+            // create()'s catch, which calls rollBack() on an ALREADY-committed
+            // transaction — turning a created room into a 500.
+            \Log::warning('Room announcement failed: ' . $e->getMessage());
+        }
+    }
+
+    private function fireRoomEvent($room, $opener, bool $isPrivate): void
     {
         $group = $room->group;
         if (! $group) {
+            \Log::warning("Room {$room->id} has no group — announcement skipped.");
             return;
         }
+
+        $body = $isPrivate
+            ? [
+                'ar' => 'بدأت غرفة صوتية خاصة في مجموعة ' . $group->name . ': ' . $room->name,
+                'en' => 'A private voice room has started in ' . $group->name . ': ' . $room->name,
+            ]
+            : [
+                'ar' => 'بدأ بث مباشر في مجموعة ' . $group->name . ': ' . $room->name,
+                'en' => 'A live stream has started in ' . $group->name . ': ' . $room->name,
+            ];
 
         $this->events->notifyGroupEvent(
             $group,
             'live_stream_started',
-            title: ['ar' => 'بث مباشر', 'en' => 'Live stream'],
-            body: [
-                'ar' => 'بدأ بث مباشر في المجموعة: ' . $room->name,
-                'en' => 'A live stream has started in the group: ' . $room->name,
+            title: [
+                'ar' => 'بث مباشر في ' . $group->name,
+                'en' => 'Live stream in ' . $group->name,
             ],
+            body: $body,
             actor: $opener,
+            notifiables: $isPrivate ? collect() : null,
         );
     }
 

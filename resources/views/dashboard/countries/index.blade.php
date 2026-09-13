@@ -17,7 +17,15 @@
                                 <a href="{{ route('admin.countries.create') }}"
                                     class="btn btn-primary mb-2 waves-effect waves-light">
                                     <i class="fas fa-plus"></i>&nbsp; {{__('add new')}} </a>
-                              
+
+                                @include('dashboard.partials.datatable-filters', [
+                                    'tableId' => 'country-table',
+                                    'filters' => [
+                                        ['key' => 'name', 'label' => __('name')],
+                                        ['key' => 'country_code', 'label' => __('phone code')],
+                                    ],
+                                ])
+
                                 <div class="table-responsive">
                                     {{ $dataTable->table()}}
                                 </div>

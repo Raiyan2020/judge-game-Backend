@@ -36,10 +36,10 @@ class PackageSubscriptionDataTable extends DataTable
             ->editColumn('total', fn (PackageSubscription $subscription) => format_money($subscription->total))
             ->editColumn('discount', fn (PackageSubscription $subscription) => format_money($subscription->discount))
             ->filterColumn('total', function ($query, $keyword) {
-                $query->where('package_subscriptions.total', 'like', "%{$keyword}%");
+                $this->filterMoneyColumn($query, 'package_subscriptions.total', $keyword);
             })
             ->filterColumn('discount', function ($query, $keyword) {
-                $query->where('package_subscriptions.discount', 'like', "%{$keyword}%");
+                $this->filterMoneyColumn($query, 'package_subscriptions.discount', $keyword);
             })
             ->filterColumn('package_name', function ($query, $keyword) {
                 $query->whereHas('package', function ($packageQuery) use ($keyword) {
@@ -55,16 +55,34 @@ class PackageSubscriptionDataTable extends DataTable
                 });
             })
             ->filterColumn('starts_at', function ($query, $keyword) {
-                $query->whereDate('starts_at', 'like', "%{$keyword}%");
+                // The cell shows the Y-m-d part only, so match on that.
+                $query->whereDate('package_subscriptions.starts_at', 'like', "%{$keyword}%");
             })
             ->filterColumn('ends_at', function ($query, $keyword) {
-                $query->whereDate('ends_at', 'like', "%{$keyword}%");
+                $query->whereDate('package_subscriptions.ends_at', 'like', "%{$keyword}%");
             })
            
           
             ->addIndexColumn()
             ->rawColumns(['package_name', 'user_name', 'starts_at', 'ends_at', 'total', 'discount'])
             ->setRowId('id');
+    }
+
+    /**
+     * Filter a money column by the keyword the admin actually sees.
+     *
+     * The cell is rendered with format_money(), which rounds to a whole number
+     * and appends the currency ("10.500" is displayed as "11 د.ك"), so match the
+     * stored decimal AND its rounded form, after dropping the currency label.
+     */
+    protected function filterMoneyColumn($query, string $column, $keyword): void
+    {
+        $needle = trim(str_replace([__(app_currency()), app_currency()], '', (string) $keyword));
+
+        $query->where(function ($q) use ($column, $needle) {
+            $q->where($column, 'like', "%{$needle}%")
+                ->orWhereRaw("ROUND({$column}) like ?", ["%{$needle}%"]);
+        });
     }
 
     /**
@@ -81,9 +99,12 @@ class PackageSubscriptionDataTable extends DataTable
     public function html(): HtmlBuilder
     {
         return $this->builder()
-            ->setTableId('package-table')
+            ->setTableId('package-subscription-table')
             ->columns($this->getColumns())
-            ->minifiedAjax()
+            // NOT minifiedAjax(): its data callback strips `searchable` and the
+            // per-column `search` payload, which is exactly what the column
+            // filters need to reach filterColumn() on the server.
+            ->ajax(route('admin.subscriptions.index', [], false))
             ->dom('Bfrtip')
             ->orderBy(0)
             ->responsive(true)
@@ -126,8 +147,8 @@ class PackageSubscriptionDataTable extends DataTable
             Column::computed('user_name')->title(__('username'))->searchable(),
             Column::make('total')->title(__('total'))->searchable(),
             Column::make('discount')->title(__('discount'))->searchable(),
-            Column::computed('starts_at')->title(__('starts at')),
-            Column::computed('ends_at')->title(__('ends at')),
+            Column::computed('starts_at')->title(__('starts at'))->searchable(),
+            Column::computed('ends_at')->title(__('ends at'))->searchable(),
         ];
     }
 

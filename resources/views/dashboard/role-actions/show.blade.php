@@ -21,6 +21,15 @@
                 'rows' => $earnedRows,
             ];
         }
+
+        // Localized empty state: a role with no actions must not render a bare page.
+        if (! $sections) {
+            $sections[] = [
+                'title' => __('points'),
+                'content' => '<span class="admin-show-empty">' . e(__('There is no data')) . '</span>',
+                'full' => true,
+            ];
+        }
     @endphp
 
     @include('dashboard.partials.show-page', [

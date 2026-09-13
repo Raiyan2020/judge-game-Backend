@@ -4,6 +4,7 @@
     @include('dashboard.partials.show-page', [
         'title' => __('user profile') . ' - ' . $user->name,
         'backUrl' => route('admin.users.index'),
+        'editUrl' => route('admin.users.edit', $user),
         'sections' => [
             [
                 'title' => __('basic information'),
@@ -12,6 +13,10 @@
                     ['label' => __('user name'), 'value' => $user->username ?? '-'],
                     ['label' => __('nickname'), 'value' => $user->nickname ?? '-'],
                     ['label' => __('gender'), 'value' => $user->gender ? __($user->gender) : '-'],
+                    [
+                        'label' => __('birthdate'),
+                        'value' => $user->birthdate ? substr((string) $user->birthdate, 0, 10) : '-',
+                    ],
                     ['label' => __('status'), 'value' => $user->status ? __($user->status) : '-'],
                 ],
             ],
@@ -21,6 +26,7 @@
                     ['label' => __('phone code'), 'value' => $user->country_code ?? '-'],
                     ['label' => __('phone'), 'value' => $user->phone ?? '-'],
                     ['label' => __('full phone'), 'value' => $user->full_phone ?? '-'],
+                    ['label' => __('country'), 'value' => $user->country?->name ?: '-'],
                     ['label' => __('language'), 'value' => $user->language ? __($user->language) : '-'],
                 ],
             ],

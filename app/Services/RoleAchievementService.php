@@ -243,10 +243,22 @@ class RoleAchievementService
     }
 
     /**
-     * Idempotently pays one completed rung and announces it. The stable reason
-     * `title_reward:{groupId}:{roleTitleId}:{userId}` is the single marker guarding
-     * BOTH the point award and the one-shot group event, so re-reads never
-     * double-pay or re-announce.
+     * Idempotently pays one completed rung and announces it.
+     *
+     * TWO separate markers in `point_transactions.notes`, deliberately:
+     *   `title_reward:{g}:{t}:{u}`   — guards the POINT AWARD (exactly once).
+     *   `title_announce:{g}:{t}:{u}` — guards the GROUP EVENT (announced once).
+     *
+     * They used to be one marker, which made the announcement unrecoverable: the
+     * award is written first, so any rung whose announce leg failed (or which was
+     * paid before the event existed at all) was permanently marked "done" and
+     * could never announce again — the member earned an achievement and heard
+     * nothing, forever. Splitting them keeps the payment exactly-once while
+     * letting an already-paid rung still announce on the next read.
+     *
+     * A rung with no reward_points (an unseeded ladder still at the migration
+     * default 0) is now announced too — it is a real achievement even when it
+     * pays nothing; only the award is skipped.
      */
     private function awardRung(
         $title,
@@ -256,22 +268,21 @@ class RoleAchievementService
     ): void {
         $rewardPoints = (int) ($title->reward_points ?? 0);
 
-        // A rung still at the migration default (0) has no marker to write, so an
-        // ungated event would fire every read — skip both award and announce.
-        if ($rewardPoints <= 0) {
-            return;
-        }
-
         // `point_transactions.notes` is the idempotency (reason) column.
         $reason = "title_reward:{$group->id}:{$title->id}:{$user->id}";
+        $announceReason = "title_announce:{$group->id}:{$title->id}:{$user->id}";
 
         try {
-            if (PointTransaction::where('notes', $reason)->exists()) {
+            $paid = $rewardPoints <= 0
+                || PointTransaction::where('notes', $reason)->exists();
+            $announced = PointTransaction::where('notes', $announceReason)->exists();
+
+            if ($paid && $announced) {
                 return;
             }
 
             // Build the bilingual announcement BEFORE the award, so a translation
-            // read that throws can't burn the marker on a lost event.
+            // read that throws can't burn a marker on a lost event.
             $name = $user->name;
             $titleAr = $title->getTranslation('title', 'ar');
             $titleEn = $title->getTranslation('title', 'en');
@@ -283,33 +294,75 @@ class RoleAchievementService
                 ? $title->role
                 : $role;
 
-            app(PointsService::class)->award(
-                (int) $user->id,
-                $rewardRole,
-                $rewardPoints,
-                $reason
-            );
+            if (! $paid) {
+                app(PointsService::class)->award(
+                    (int) $user->id,
+                    $rewardRole,
+                    $rewardPoints,
+                    $reason
+                );
+            }
 
-            $body = [
-                'ar' => "حصل {$name} على إنجاز {$titleAr}",
-                'en' => "{$name} earned the achievement {$titleEn}",
-            ];
-
-            // Fires bell + news + chat once, on the transition only (guarded by the
-            // same reason marker above). `actor: $user` named so the call survives
-            // the optional `subjectId` param another agent is adding to
-            // GroupEventService (we intentionally do NOT pass subjectId yet).
-            app(GroupEventService::class)->notifyGroupEvent(
-                $group,
-                'achievement_earned',
-                $body,
-                $body,
-                actor: $user,
-            );
+            if (! $announced) {
+                $this->announceRung(
+                    $group,
+                    $user,
+                    $announceReason,
+                    [
+                        'ar' => "حصل {$name} على إنجاز {$titleAr} في مجموعة {$group->name}",
+                        'en' => "{$name} earned the achievement {$titleEn} in {$group->name}",
+                    ]
+                );
+            }
         } catch (\Throwable $e) {
             Log::warning(
                 'Achievement reward failed: ' . $e->getMessage()
             );
         }
+    }
+
+    /**
+     * Fires the one-shot `achievement_earned` event, then burns its marker.
+     *
+     * The EARNER is explicitly among the recipients: notifyGroupEvent excludes
+     * the actor from the bell (they caused the event), which for an achievement
+     * silenced the one person who most needs it — the member who earned it saw
+     * nothing (QA: «حصول عضو على إنجاز» missing from notifications). Passing the
+     * recipients explicitly keeps the actor attribution on the news row while
+     * still ringing everyone's bell, the earner included.
+     *
+     * Marker AFTER the fan-out, so a crash mid-way retries on the next read
+     * instead of losing the announcement (notifyGroupEvent is fail-soft per
+     * channel and does not throw).
+     *
+     * The marker is NOT an award: 0 points and a NULL role, so it is structurally
+     * outside all four role buckets the `points` view groups by (which is pure
+     * SUM(points) — verified — so it cannot move a score either way). Written
+     * directly rather than through PointsService, which exists to pay points.
+     */
+    private function announceRung(
+        Group $group,
+        User $user,
+        string $announceReason,
+        array $body
+    ): void {
+        $recipients = $group->users()
+            ->wherePivot('status', 'accepted')
+            ->get();
+
+        app(GroupEventService::class)->notifyGroupEvent(
+            $group,
+            'achievement_earned',
+            ['ar' => 'إنجاز جديد', 'en' => 'New achievement'],
+            $body,
+            actor: $user,
+            notifiables: $recipients,
+            subjectId: (int) $user->id,
+        );
+
+        PointTransaction::firstOrCreate(
+            ['user_id' => (int) $user->id, 'notes' => $announceReason],
+            ['role' => null, 'points' => 0],
+        );
     }
 }

@@ -113,4 +113,90 @@ class AchievementRewardTest extends TestCase
             'Re-reading achievements must not double-pay the reward.'
         );
     }
+
+    /**
+     * Earning a rung announces it ONCE on the group channels, and the EARNER is
+     * among the recipients — notifyGroupEvent excludes the actor from the bell,
+     * which silenced the one person who needed it (QA: an earned achievement
+     * reached neither notifications nor the news feed).
+     *
+     * Also pins the marker split: the announcement is guarded by its own
+     * `title_announce:` row, NOT by the payment marker — sharing one made an
+     * already-paid rung unannounceable forever.
+     */
+    public function test_completed_rung_announces_once_and_notifies_the_earner(): void
+    {
+        $owner = User::factory()->create();
+        $member = User::factory()->create();
+
+        $group = Group::create([
+            'name' => 'Announce Group',
+            'user_id' => $owner->id,
+        ]);
+
+        foreach ([$owner, $member] as $participant) {
+            $participant->groups()->attach($group->id, [
+                'role' => 'citizen',
+                'status' => 'accepted',
+            ]);
+        }
+
+        $action = RoleAction::create([
+            'role' => 'citizen',
+            'key' => 'file_lawsuit',
+            'title' => ['ar' => 'رفع دعوى', 'en' => 'File a lawsuit'],
+        ]);
+
+        $title = RoleTitle::create([
+            'role' => 'citizen',
+            'tier' => 1,
+            'reward_points' => 100,
+            'title' => ['ar' => 'مبتدئ', 'en' => 'Rookie'],
+        ]);
+
+        RoleTitleRequirement::create([
+            'role_title_id' => $title->id,
+            'role_action_id' => $action->id,
+            'required_count' => 0,
+        ]);
+
+        $this->actingAs($member, 'sanctum')
+            ->getJson("/api/groups/{$group->id}/achievements")
+            ->assertOk();
+
+        // News row, attributed to the earner as its subject.
+        $this->assertDatabaseHas('legal_case_news', [
+            'type' => 'achievement_earned',
+            'group_id' => $group->id,
+            'actor_id' => $member->id,
+            'subject_id' => $member->id,
+        ]);
+
+        // The bell reaches the earner themselves, not just the rest of the group.
+        $this->assertSame(
+            1,
+            $member->notifications()
+                ->where('data->type', 'achievement_earned')
+                ->count(),
+            'The member who earned the achievement must be notified.'
+        );
+
+        // Announcement guarded by its OWN marker.
+        $this->assertDatabaseHas('point_transactions', [
+            'user_id' => $member->id,
+            'points' => 0,
+            'notes' => "title_announce:{$group->id}:{$title->id}:{$member->id}",
+        ]);
+
+        // Second read announces nothing new.
+        $this->actingAs($member, 'sanctum')
+            ->getJson("/api/groups/{$group->id}/achievements")
+            ->assertOk();
+
+        $this->assertSame(
+            1,
+            \App\Models\LegalCaseNews::where('type', 'achievement_earned')->count(),
+            'Re-reading achievements must not re-announce the same rung.'
+        );
+    }
 }

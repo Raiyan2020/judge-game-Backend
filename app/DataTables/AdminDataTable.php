@@ -53,13 +53,19 @@ class AdminDataTable extends DataTable
         return $this->builder()
             ->setTableId('admin-table')
             ->columns($this->getColumns())
-            ->minifiedAjax()
+            // NOT minifiedAjax(): its data callback strips `searchable` and the
+            // per-column `search` payload, which is exactly what the column
+            // filters need to reach filterColumn() on the server.
+            ->ajax(route('admin.admins.index', [], false))
             ->dom('Bfrtip')
             ->orderBy(0)
             ->responsive(true)
             ->selectStyleSingle()
             ->responsive()
             ->buttons([])
+            ->parameters([
+                'searching' => true,
+            ])
             ->language([
                 'lengthMenu' => '_MENU_',
                 'sProcessing' => __('Loading...'),
@@ -89,9 +95,9 @@ class AdminDataTable extends DataTable
     {
         return [
             Column::computed('DT_RowIndex')->title('#'),
-            Column::make('name')->title(__('name')),
-            Column::make('phone')->title(__('phone')),
-            Column::make('email')->title(__('email')),
+            Column::make('name')->title(__('name'))->searchable(),
+            Column::make('phone')->title(__('phone'))->searchable(),
+            Column::make('email')->title(__('email'))->searchable(),
             Column::computed('action')->title(__('actions'))
 
         ];

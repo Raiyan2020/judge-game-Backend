@@ -70,31 +70,38 @@ class StoreRequest extends FormRequest
     }
 
     /**
+     * Only rules whose sentence is NOT covered by lang/{locale}/validation.php are
+     * overridden here. Everything else (required / integer / array / string / min /
+     * max / enum / exists) deliberately falls through to the localized validation
+     * file so the Arabic wording stays in one place.
+     *
+     * IMPORTANT — do not re-introduce `['attribute' => trans('admin.attributes.<x>')]`
+     * here. `lang/{locale}/admin.php` stores the per-field names as FLAT keys that
+     * themselves contain dots ('title.ar', 'actions.*.required_count', ...). The
+     * translator resolves a key with `Arr::get()`, which walks the dots segment by
+     * segment: 'attributes' -> array, 'title' -> the STRING 'العنوان', then it cannot
+     * descend into a string and returns null, so `trans()` hands back the raw key.
+     * That is exactly what shipped before and why the messages rendered with a bare
+     * `admin.attributes.title.ar` spliced into the Arabic sentence (bug B-08).
+     *
+     * `:attribute` is intentionally left untouched in every message below: the
+     * validator substitutes it afterwards from `attributes()` (UsesAdminAttributes),
+     * which looks the flat dotted keys up by exact array key and therefore DOES
+     * resolve them.
+     *
      * @return array<string, string>
      */
     public function messages(): array
     {
         return [
-            'title.required' => __('validation.required', ['attribute' => trans('admin.attributes.title')]),
-            'title.ar.required' => __('validation.required', ['attribute' => trans('admin.attributes.title.ar')]),
-            'title.en.required' => __('validation.required', ['attribute' => trans('admin.attributes.title.en')]),
-            'role.required' => __('validation.required', ['attribute' => trans('admin.attributes.role')]),
-            'tier.required' => __('validation.required', ['attribute' => trans('admin.attributes.tier')]),
-            'tier.unique' => __('role title tier unique', ['attribute' => trans('admin.attributes.tier')]),
-            'reward_points.required' => __('validation.required', ['attribute' => trans('admin.attributes.reward_points')]),
+            'tier.unique' => __('role title tier unique'),
             'actions.required' => __('role title actions required'),
             'actions.min' => __('role title actions required'),
-            'actions.*.role_action_id.required' => __('validation.required', ['attribute' => trans('admin.attributes.actions.*.role_action_id')]),
-            'actions.*.required_count.required' => __('validation.required', ['attribute' => trans('admin.attributes.actions.*.required_count')]),
+            'actions.*.required_count.integer' => __('points must be integer'),
             'actions.*.required_count.max' => __('required count max exceeded', [
-                'attribute' => trans('admin.attributes.actions.*.required_count'),
                 'max' => number_format(RoleAction::MAX_POINTS),
             ]),
-            'actions.*.required_count.integer' => __('points must be integer', [
-                'attribute' => trans('admin.attributes.actions.*.required_count'),
-            ]),
             'reward_points.max' => __('points max exceeded', [
-                'attribute' => trans('admin.attributes.reward_points'),
                 'max' => number_format(RoleAction::MAX_POINTS),
             ]),
         ];

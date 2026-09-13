@@ -31,15 +31,19 @@ class RoleActionController extends Controller
 
     public function store(StoreRequest $request)
     {
-        $this->roleActionService->updatePoints($request->validated());
+        $data = $request->validated();
+
+        $this->roleActionService->updatePoints($data);
         updated();
 
-        $role = $request->input('role');
+        // Always come back to the points page of the role that was edited.
+        // The role is read from the saved actions when the hidden input is
+        // missing, so the save never falls back to the roles list.
+        $role = $this->roleActionService->resolveRole($data);
 
-        return redirect()->route(
-            $role ? 'admin.role-actions.show' : 'admin.role-actions.index',
-            $role ? ['role' => $role] : []
-        );
+        return $role
+            ? redirect()->route('admin.role-actions.show', ['role' => $role])
+            : redirect()->route('admin.role-actions.index');
     }
 
     public function edit(string $role)

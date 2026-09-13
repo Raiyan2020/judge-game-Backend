@@ -2,6 +2,7 @@
 
 namespace App\DataTables;
 
+use App\Enums\GroupRole;
 use App\Models\RoleTitle;
 use Illuminate\Database\Eloquent\Builder as QueryBuilder;
 use Yajra\DataTables\EloquentDataTable;
@@ -35,6 +36,26 @@ class RoleTitleDataTable extends DataTable
              ->addColumn('role', function ($roleTitle) {
                 return __($roleTitle->role);
              })
+            ->filterColumn('role', function ($query, $keyword) {
+                // The column is rendered with __(), so accept the translated
+                // label ("قاضي") as well as the raw stored value ("judge").
+                $needle = mb_strtolower(trim((string) $keyword));
+
+                $values = collect(GroupRole::cases())
+                    ->filter(fn (GroupRole $role) => str_contains(mb_strtolower(__($role->value)), $needle)
+                        || str_contains($role->value, $needle))
+                    ->map(fn (GroupRole $role) => $role->value)
+                    ->values()
+                    ->all();
+
+                $query->where(function ($q) use ($needle, $values) {
+                    $q->where('role_titles.role', 'like', "%{$needle}%");
+
+                    if ($values) {
+                        $q->orWhereIn('role_titles.role', $values);
+                    }
+                });
+            })
              
            
              ->addIndexColumn()
@@ -59,7 +80,10 @@ class RoleTitleDataTable extends DataTable
         return $this->builder()
                     ->setTableId('role-title-table')
                     ->columns($this->getColumns())
-                    ->minifiedAjax()
+                    // NOT minifiedAjax(): its data callback strips `searchable`
+                    // and the per-column `search` payload, which is exactly what
+                    // the column filters need to reach filterColumn() on the server.
+                    ->ajax(route('admin.role-titles.index', [], false))
                     ->dom('Bfrtip')
                     ->orderBy(0)
                     ->responsive(true)
@@ -100,7 +124,7 @@ class RoleTitleDataTable extends DataTable
         return [
             Column::computed('DT_RowIndex')->title('#'),
             Column::computed('title')->title(__('title'))->searchable(),
-            Column::computed('role')->title(__('role')),
+            Column::computed('role')->title(__('role'))->searchable(),
             Column::computed('action')->title(__('actions')),
         ];
     }

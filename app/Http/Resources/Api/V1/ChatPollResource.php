@@ -19,9 +19,16 @@ class ChatPollResource extends JsonResource
             // The law text BEFORE an edit/delete, so the card can show
             // before → after (data.description is the "after"). Null for a
             // create/ads poll (JG-018/JG-019).
-            'current_law' => $this->group_law_id
-                ? optional($this->groupLaw)->description
-                : null,
+            //
+            // M-05: prefer the IMMUTABLE snapshot taken at proposal time
+            // (`data.current_law`). The live `groupLaw` relation is wrong for a
+            // SETTLED poll — an approved update has already rewritten that law,
+            // and an approved delete removed it and nulled `group_law_id` — which
+            // is why closed cards lost the targeted law / showed the post-edit
+            // text as the "before". The live read stays only as the fallback for
+            // polls created before the snapshot existed.
+            'current_law' => ($this->data['current_law'] ?? null)
+                ?: ($this->group_law_id ? optional($this->groupLaw)->description : null),
             // The option the current user voted for (null when they haven't) so
             // the app's checkmark survives a reload.
             'my_vote_option_id' => $this->relationLoaded('options')

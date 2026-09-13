@@ -30,7 +30,14 @@ class GroupEventService
      * @param  ?User   $actor       who caused the event (excluded from the bell)
      * @param  ?int    $caseId      the case, when the event is case-scoped
      * @param  ?\Illuminate\Support\Collection  $notifiables  override recipients; defaults to accepted members
+     *                              (pass an EMPTY collection to skip the bell entirely — e.g. a private
+     *                              room that already sent its own targeted invite)
      * @param  ?int    $subjectId   the event's subject (e.g. the joining user) so the news row can render/deep-link a name
+     * @param  ?array  $chatBody    ['ar'=>..,'en'=>..] chat-only wording; defaults to $body. The news/bell
+     *                              copy names the group (the reader is outside it); inside the group's own
+     *                              timeline that is noise, so the chat line can drop it.
+     * @param  bool    $withChat    false for events whose chat presence already exists (an announcement
+     *                              poll IS its own chat card — a system mirror would double it)
      */
     public function notifyGroupEvent(
         Group $group,
@@ -41,10 +48,14 @@ class GroupEventService
         ?int $caseId = null,
         $notifiables = null,
         ?int $subjectId = null,
+        ?array $chatBody = null,
+        bool $withChat = true,
     ): void {
         $this->pushNews($group, $type, $body, $actor, $caseId, $subjectId);
         $this->pushBell($group, $type, $title, $body, $actor, $caseId, $notifiables);
-        $this->pushChat($group, $body);
+        if ($withChat) {
+            $this->pushChat($group, $chatBody ?? $body);
+        }
     }
 
     private function pushNews(Group $group, string $type, array $body, ?User $actor, ?int $caseId, ?int $subjectId = null): void

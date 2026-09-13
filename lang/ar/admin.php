@@ -41,5 +41,12 @@ return [
         'whatsapp' => 'واتساب',
         'whatsapp_country_code' => 'رمز واتساب',
         'profile_type' => 'نوع الحساب',
+        'username' => 'اسم المستخدم',
+        'nickname' => 'اللقب',
+        'gender' => 'الجنس',
+        'birthdate' => 'تاريخ الميلاد',
+        'language' => 'اللغة',
+        'status' => 'الحالة',
+        'country_id' => 'الدولة',
     ],
 ];

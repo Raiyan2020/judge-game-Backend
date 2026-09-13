@@ -27,6 +27,9 @@ class CouponDataTable extends DataTable
                 $query->where('coupons.code', 'like', "%{$keyword}%");
             })
             ->filterColumn('discount', function ($query, $keyword) {
+                // The column is rendered as "40%", so accept the displayed form too.
+                $keyword = trim(rtrim(trim((string) $keyword), '%'));
+
                 $query->where('coupons.discount', 'like', "%{$keyword}%");
             })
             ->filterColumn('start_at', function ($query, $keyword) {
@@ -50,7 +53,10 @@ class CouponDataTable extends DataTable
         return $this->builder()
             ->setTableId('coupon-table')
             ->columns($this->getColumns())
-            ->minifiedAjax()
+            // NOT minifiedAjax(): its data callback strips `searchable` and the
+            // per-column `search` payload, which is exactly what the column
+            // filters need to reach filterColumn() on the server.
+            ->ajax(route('admin.coupons.index', [], false))
             ->dom('Bfrtip')
             ->orderBy(0)
             ->responsive(true)

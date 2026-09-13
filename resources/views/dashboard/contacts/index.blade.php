@@ -12,6 +12,16 @@
                         </div>
                         <div class="card-content">
                             <div class="card-body card-dashboard">
+                                @include('dashboard.partials.datatable-filters', [
+                                    'tableId' => 'contact-table',
+                                    'filters' => [
+                                        ['key' => 'name', 'label' => __('name')],
+                                        ['key' => 'email', 'label' => __('email')],
+                                        ['key' => 'formatted_phone', 'label' => __('phone')],
+                                        ['key' => 'message', 'label' => __('message')],
+                                    ],
+                                ])
+
                                 <div class="table-responsive">
                                     {{ $dataTable->table()}}
                                 </div>

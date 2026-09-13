@@ -47,12 +47,18 @@ class ContactDataTable extends DataTable
         return $this->builder()
             ->setTableId('contact-table')
             ->columns($this->getColumns())
-            ->minifiedAjax()
+            // NOT minifiedAjax(): its data callback strips `searchable` and the
+            // per-column `search` payload, which is exactly what the column
+            // filters need to reach filterColumn() on the server.
+            ->ajax(route('admin.contacts.index', [], false))
             ->dom('Bfrtip')
             ->orderBy(0)
             ->responsive(true)
             ->selectStyleSingle()
             ->buttons([])
+            ->parameters([
+                'searching' => true,
+            ])
             ->language([
                 'lengthMenu' => '_MENU_',
                 'sProcessing' => __('Loading...'),

@@ -142,7 +142,12 @@ class GroupMemberService
        $joinRole = $pivot->role ?? '';
 
        $this->repo->updateGroupMemberStatus($group, $user, 'accepted');
-       $group->chat?->users()->attach($user->id);
+       // Read the chat fresh (not through a possibly-stale loaded relation) and
+       // attach idempotently — a duplicate chat_user row would double the member
+       // in the chat's participant list. This MUST stay ahead of the event below:
+       // the chat system message is written into this chat.
+       $group->load('chat');
+       $group->chat?->users()->syncWithoutDetaching([$user->id]);
 
        $this->notifyOwnerOfResponse($group, $user, true, $inviterId);
 
@@ -150,17 +155,30 @@ class GroupMemberService
        // the whole group learns someone joined — previously nothing fired but
        // the inviter ping. Actor = the joining user (excluded from the bell,
        // and set as the news subject for a name/deep-link target).
+       //
+       // The bell and the news row NAME THE GROUP: both are read outside the
+       // group (a global notification list / the global news feed), where
+       // "a new member joined" alone says nothing about WHICH group (QA:
+       // «وضّح اسم المجموعه»). The chat line keeps the short wording — it is
+       // already inside that group's timeline.
        $roleLabel = $this->roleLabels($joinRole);
        $this->events->notifyGroupEvent(
            $group,
            'member_joined',
-           title: ['ar' => 'عضو جديد', 'en' => 'New member'],
+           title: [
+               'ar' => 'عضو جديد في ' . $group->name,
+               'en' => 'New member in ' . $group->name,
+           ],
            body: [
-               'ar' => 'انضمّ عضو جديد: ' . $user->name . ' (' . $roleLabel['ar'] . ')',
-               'en' => 'A new member joined: ' . $user->name . ' (' . $roleLabel['en'] . ')',
+               'ar' => 'انضمّ ' . $user->name . ' (' . $roleLabel['ar'] . ') إلى مجموعة ' . $group->name,
+               'en' => $user->name . ' (' . $roleLabel['en'] . ') joined the group ' . $group->name,
            ],
            actor: $user,
            subjectId: $user->id,
+           chatBody: [
+               'ar' => 'انضمّ عضو جديد: ' . $user->name . ' (' . $roleLabel['ar'] . ')',
+               'en' => 'A new member joined: ' . $user->name . ' (' . $roleLabel['en'] . ')',
+           ],
        );
 
        return $user;

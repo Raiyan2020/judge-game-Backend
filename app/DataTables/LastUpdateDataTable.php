@@ -31,6 +31,9 @@ class LastUpdateDataTable extends DataTable
                     ->orWhereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(title, '$.ar'))) like LOWER(?)", ["%$keyword%"]);
             });
         })
+        ->filterColumn('version', function ($query, $keyword) {
+            $query->where('last_updates.version', 'like', "%{$keyword}%");
+        })
         ->addColumn('status', function ($lastUpdate) {
             return view('dashboard.last-updates.status', ['lastUpdate' => $lastUpdate]);
         })
@@ -58,12 +61,18 @@ class LastUpdateDataTable extends DataTable
         return $this->builder()
             ->setTableId('last-update-table')
             ->columns($this->getColumns())
-            ->minifiedAjax()
+            // NOT minifiedAjax(): its data callback strips `searchable` and the
+            // per-column `search` payload, which is exactly what the column
+            // filters need to reach filterColumn() on the server.
+            ->ajax(route('admin.last-updates.index', [], false))
             ->dom('Bfrtip')
             ->orderBy(0)
             ->responsive(true)
             ->selectStyleSingle()
             ->buttons([])
+            ->parameters([
+                'searching' => true,
+            ])
             ->language([
                 'lengthMenu' => '_MENU_',
                 'sProcessing' => __('Loading...'),

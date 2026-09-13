@@ -16,6 +16,15 @@
                                 <a href="{{ route('admin.role-titles.create') }}"
                                     class="btn btn-primary mb-2 waves-effect waves-light">
                                     <i class="fas fa-plus"></i>&nbsp; {{__('add new')}} </a>
+
+                                @include('dashboard.partials.datatable-filters', [
+                                    'tableId' => 'role-title-table',
+                                    'filters' => [
+                                        ['key' => 'title', 'label' => __('title')],
+                                        ['key' => 'role', 'label' => __('role')],
+                                    ],
+                                ])
+
                                 <div class="table-responsive">
                                     {{ $dataTable->table()}}
                                 </div>

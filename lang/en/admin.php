@@ -41,5 +41,12 @@ return [
         'whatsapp' => 'WhatsApp',
         'whatsapp_country_code' => 'WhatsApp country code',
         'profile_type' => 'Profile type',
+        'username' => 'Username',
+        'nickname' => 'Nickname',
+        'gender' => 'Gender',
+        'birthdate' => 'Birthdate',
+        'language' => 'Language',
+        'status' => 'Status',
+        'country_id' => 'Country',
     ],
 ];

@@ -64,7 +64,10 @@ class CountryDataTable extends DataTable
         return $this->builder()
                     ->setTableId('country-table')
                     ->columns($this->getColumns())
-                    ->minifiedAjax()
+                    // NOT minifiedAjax(): its data callback strips `searchable` and the
+                    // per-column `search` payload, which is exactly what the column
+                    // filters need to reach filterColumn() on the server.
+                    ->ajax(route('admin.countries.index', [], false))
                     ->dom('Bfrtip')
                     ->orderBy(0)
                     ->responsive(true)

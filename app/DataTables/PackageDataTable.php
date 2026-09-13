@@ -60,7 +60,10 @@ class PackageDataTable extends DataTable
         return $this->builder()
             ->setTableId('package-table')
             ->columns($this->getColumns())
-            ->minifiedAjax()
+            // NOT minifiedAjax(): its data callback strips `searchable` and the
+            // per-column `search` payload, which is exactly what the column
+            // filters need to reach filterColumn() on the server.
+            ->ajax(route('admin.packages.index', [], false))
             ->dom('Bfrtip')
             ->orderBy(0)
             ->responsive(true)

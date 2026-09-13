@@ -310,7 +310,20 @@
                 dom: 'Brtip',
                 order: [[0, 'desc']],
                 responsive: true,
-                buttons: []
+                buttons: [],
+                language: {
+                    emptyTable: @json(__('There is no data')),
+                    zeroRecords: @json(__('There is no data')),
+                    processing: @json(__('Loading...')),
+                    loadingRecords: @json(__('Loading...')),
+                    info: @json(__('Showing _START_ to _END_ of _TOTAL_ entries')),
+                    infoEmpty: @json(__('Showing 0 to 0 of 0 entries')),
+                    infoFiltered: @json(__('(filtered from _MAX_ total entries)')),
+                    paginate: {
+                        next: "<i class='next'></i>",
+                        previous: "<i class='previous'></i>"
+                    }
+                }
             });
 
             $(document).on('init.dt draw.dt', function (e, settings) {

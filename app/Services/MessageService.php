@@ -141,15 +141,14 @@ class MessageService
     {
         $chat = $this->getGroupChat($group);
         if (! $chat) {
+            // Loud, because the caller (GroupEventService) swallows failures per
+            // channel: a group with no chat row is the ONLY remaining way an
+            // event reaches the news feed but not the timeline.
+            \Log::warning("System message skipped: group {$group->id} has no chat row.");
             return;
         }
 
-        $message = ChatMessage::create([
-            'user_id' => null,
-            'chat_id' => $chat->id,
-            'message' => $text,
-            'type' => 'system',
-        ]);
+        $message = $this->createSystemMessage($chat->id, $text, $group);
 
         try {
             // NOT ->toOthers(): a system message is held by no client (nobody
@@ -159,6 +158,54 @@ class MessageService
         } catch (\Throwable $e) {
             \Log::warning('Broadcast system MessageSent failed: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Writes the authorless (`user_id` null) system row.
+     *
+     * `chat_messages.user_id` was created NOT NULL, so on a database that has
+     * not yet run `..._make_chat_messages_user_id_nullable` this insert throws
+     * an integrity-constraint violation — which the calling GroupEventService
+     * channel catches, making every system message vanish silently. Deploys here
+     * lag behind code, so fall back ONCE to the group owner as the author (the
+     * app renders by `type === 'system'`, not by author, so it still shows as a
+     * centred notice) and log loudly enough to get the migration run. Only the
+     * null-constraint violation is absorbed; any other query error rethrows.
+     */
+    private function createSystemMessage($chatId, string $text, Group $group): ChatMessage
+    {
+        $row = [
+            'user_id' => null,
+            'chat_id' => $chatId,
+            'message' => $text,
+            'type' => 'system',
+        ];
+
+        try {
+            return ChatMessage::create($row);
+        } catch (\Illuminate\Database\QueryException $e) {
+            if (! $this->isNullUserIdViolation($e)) {
+                throw $e;
+            }
+
+            \Log::error(
+                'chat_messages.user_id is still NOT NULL — run migration '
+                . '2026_09_13_100000_make_chat_messages_user_id_nullable. '
+                . 'Posting this system message under the group owner instead.'
+            );
+
+            return ChatMessage::create(['user_id' => $group->user_id] + $row);
+        }
+    }
+
+    /** True only for "user_id cannot be null" (MySQL 1048 / sqlite NOT NULL). */
+    private function isNullUserIdViolation(\Illuminate\Database\QueryException $e): bool
+    {
+        $message = strtolower($e->getMessage());
+
+        return str_contains($message, 'user_id')
+            && (str_contains($message, 'cannot be null')
+                || str_contains($message, 'not null'));
     }
 
     public function getOrCreatePrivateChat(int $userId): Chat
@@ -247,7 +294,8 @@ class MessageService
         // must be gated exactly like sendMessage(). Without this a user who
         // could not even read the group (getGroupMessages refuses them) could
         // still post a poll into it by passing its id.
-        $this->checkMembership(Group::findOrFail($data['group_id']));
+        $group = Group::findOrFail($data['group_id']);
+        $this->checkMembership($group);
 
         $chat = $this->getChatByGroupId($data['group_id']);
 
@@ -274,7 +322,52 @@ class MessageService
             \Log::warning('Broadcast poll MessageSent failed: ' . $e->getMessage());
         }
 
+        $this->announceAd($group, $data['description'] ?? null);
+
         return $poll;
+    }
+
+    /**
+     * An in-group announcement reached ONLY the open chat: a member who was not
+     * in the chat at that moment never learned of it (QA: creating an
+     * announcement produced no notification and no news at all). Fire the
+     * unified event so it also lands in the bell and the news feed.
+     *
+     * `withChat: false` — the announcement poll card IS its own chat presence;
+     * a system mirror would show the same announcement twice in the timeline.
+     * Resolved lazily (`app(...)`) to avoid the MessageService ↔
+     * GroupEventService constructor cycle, and called OUTSIDE the write
+     * transaction (notifyGroupEvent is itself fail-soft per channel).
+     */
+    private function announceAd(Group $group, ?string $description): void
+    {
+        try {
+            $this->fireAdEvent($group, $description);
+        } catch (\Throwable $e) {
+            // The announcement itself is already persisted and broadcast — a
+            // fan-out failure must never turn a successful publish into a 500.
+            \Log::warning('Ad announcement failed: ' . $e->getMessage());
+        }
+    }
+
+    private function fireAdEvent(Group $group, ?string $description): void
+    {
+        $excerpt = \Illuminate\Support\Str::limit(trim((string) $description), 80);
+
+        app(\App\Services\GroupEventService::class)->notifyGroupEvent(
+            $group,
+            'ad_created',
+            title: [
+                'ar' => 'إعلان جديد في ' . $group->name,
+                'en' => 'New announcement in ' . $group->name,
+            ],
+            body: [
+                'ar' => 'إعلان جديد في مجموعة ' . $group->name . ($excerpt !== '' ? ': ' . $excerpt : ''),
+                'en' => 'A new announcement in ' . $group->name . ($excerpt !== '' ? ': ' . $excerpt : ''),
+            ],
+            actor: auth('sanctum')->user(),
+            withChat: false,
+        );
     }
 
     public function createPoll($data, $type)
@@ -322,15 +415,33 @@ class MessageService
 
     protected function createPollRecord($messageId, $data, $type)
     {
+        $groupLawId = $data['group_law_id'] ?? null;
+
+        // M-05: snapshot the targeted law's text AS IT READS AT PROPOSAL TIME.
+        //
+        // The card renders "before → after". Resolving the "before" through the
+        // LIVE `groupLaw` relation is only correct while the vote is open: once
+        // `applyPollResult` settles an approved poll it has already REWRITTEN the
+        // law (update_law) or DELETED it and nulled `group_law_id` (delete_law).
+        // That is why a closed delete-card lost its targeted law entirely, and a
+        // closed edit-card showed the post-edit text inside «قبل التعديل».
+        // The snapshot is immutable, so a settled card keeps showing what was
+        // actually voted on. Forward-only: polls created before this keep the old
+        // live-law fallback in ChatPollResource.
+        $currentLaw = $groupLawId
+            ? optional(GroupLaw::find($groupLawId))->description
+            : null;
+
         return ChatPoll::create([
             'chat_message_id' => $messageId,
             // No 'user_id' — chat_polls has no such column (the INSERT 500'd);
             // the proposer is the owning chat_message's user_id.
             'type' => $type,
-            'group_law_id' => $data['group_law_id'] ?? null,
+            'group_law_id' => $groupLawId,
             'data' => [
                 'description' => $data['description'] ?? null,
                 'reason' => $data['reason'] ?? null,
+                'current_law' => $currentLaw,
             ],
             'expires_at' => now()->addHours(24),
         ]);

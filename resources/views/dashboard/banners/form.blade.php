@@ -25,6 +25,7 @@
                     <label>{{ __('image') }}</label>
                     <input type="file" name="image" class="dropify" data-height="200" accept="image/*"
                         {{ @$banner->image ? 'data-default-file=' . $banner->image . '' : '' }}>
+                    <small class="form-text text-muted">{{ __('banner image hint') }}</small>
                     @error('image')
                         <span style="color: red">{{ $message }}</span>
                     @enderror

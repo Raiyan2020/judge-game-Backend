@@ -13,6 +13,14 @@
                         </div>
                         <div class="card-content">
                             <div class="card-body card-dashboard">
+                                @include('dashboard.partials.datatable-filters', [
+                                    'tableId' => 'group-table',
+                                    'filters' => [
+                                        ['key' => 'name', 'label' => __('name')],
+                                        ['key' => 'owner', 'label' => __('owner')],
+                                    ],
+                                ])
+
                                 <div class="table-responsive">
                                     {{ $dataTable->table()}}
                                 </div>

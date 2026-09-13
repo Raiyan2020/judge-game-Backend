@@ -18,7 +18,16 @@
                                     class="btn btn-primary mb-2 waves-effect waves-light">
                                     <i class="fas fa-plus"></i>&nbsp; {{ __('add new') }} 
                                 </a>
-                               
+
+                                @include('dashboard.partials.datatable-filters', [
+                                    'tableId' => 'user-table',
+                                    'filters' => [
+                                        ['key' => 'name', 'label' => __('name')],
+                                        ['key' => 'username', 'label' => __('user name')],
+                                        ['key' => 'full_phone', 'label' => __('phone')],
+                                    ],
+                                ])
+
                                 <div class="table-responsive">
                                     {{ $dataTable->table()}}
                                 </div>

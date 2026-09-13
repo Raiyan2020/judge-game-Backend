@@ -70,7 +70,10 @@ class GroupDataTable extends DataTable
         return $this->builder()
             ->setTableId('group-table')
             ->columns($this->getColumns())
-            ->minifiedAjax()
+            // NOT minifiedAjax(): its data callback strips `searchable` and the
+            // per-column `search` payload, which is exactly what the column
+            // filters need to reach filterColumn() on the server.
+            ->ajax(route('admin.groups.index', [], false))
             ->dom('Bfrtip')
             ->orderBy(0)
             ->responsive(true)

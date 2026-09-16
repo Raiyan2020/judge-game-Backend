@@ -50,7 +50,13 @@ class LastUpdateDataTable extends DataTable
      */
     public function query(LastUpdate $model): QueryBuilder
     {
-        return $model->newQuery()->latest();
+        $query = $model->newQuery();
+
+        if (datatable_has_no_explicit_order()) {
+            $query->latest();
+        }
+
+        return $query;
     }
 
     /**

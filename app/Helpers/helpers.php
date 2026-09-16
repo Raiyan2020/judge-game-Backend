@@ -199,3 +199,18 @@ function format_phone_with_code(?string $countryCode, ?string $phone): string
     return '<span dir="ltr">' . e($text) . '</span>';
 }
 
+/**
+ * True while a DataTables ajax request hasn't been given a real column to
+ * sort by — i.e. it's still on the `orderBy(0)` default every admin
+ * DataTable ships with, which points at the non-orderable "#" row-index
+ * column. Gate a `->latest()` fallback in DataTable::query() with this:
+ * Yajra's own ordering only ever appends an ORDER BY, it never clears one
+ * already on the query, so an unconditional `->latest()` stays ahead of
+ * whatever column the admin clicks and that click never visibly re-sorts
+ * anything.
+ */
+function datatable_has_no_explicit_order(): bool
+{
+    return (int) request('order.0.column', 0) === 0;
+}
+

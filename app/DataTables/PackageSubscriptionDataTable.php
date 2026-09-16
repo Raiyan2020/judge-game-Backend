@@ -90,7 +90,13 @@ class PackageSubscriptionDataTable extends DataTable
      */
     public function query(PackageSubscription $model): QueryBuilder
     {
-        return $model->newQuery()->with('package','user')->paid()->latest();
+        $query = $model->newQuery()->with('package', 'user')->paid();
+
+        if (datatable_has_no_explicit_order()) {
+            $query->latest();
+        }
+
+        return $query;
     }
 
     /**

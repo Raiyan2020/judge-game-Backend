@@ -68,7 +68,11 @@ class BannerDataTable extends DataTable
      */
     public function query(Banner $model): QueryBuilder
     {
-        $query = $model->newQuery()->latest();
+        $query = $model->newQuery();
+
+        if (datatable_has_no_explicit_order()) {
+            $query->latest();
+        }
 
         // Placement tabs on the index page (?type=home / ?type=news). No param
         // means "all", which is what the page showed before types existed.

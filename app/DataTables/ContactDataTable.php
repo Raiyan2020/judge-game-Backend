@@ -39,7 +39,13 @@ class ContactDataTable extends DataTable
 
     public function query(Contact $model): QueryBuilder
     {
-        return $model->newQuery()->select('contacts.*')->latest();
+        $query = $model->newQuery()->select('contacts.*');
+
+        if (datatable_has_no_explicit_order()) {
+            $query->latest();
+        }
+
+        return $query;
     }
 
     public function html(): HtmlBuilder

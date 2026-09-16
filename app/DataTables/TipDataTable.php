@@ -46,7 +46,13 @@ class TipDataTable extends DataTable
      */
     public function query(Tip $model): QueryBuilder
     {
-        return $model->newQuery()->latest();
+        $query = $model->newQuery();
+
+        if (datatable_has_no_explicit_order()) {
+            $query->latest();
+        }
+
+        return $query;
     }
 
     /**

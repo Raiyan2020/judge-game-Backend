@@ -69,7 +69,13 @@ class RoleTitleDataTable extends DataTable
      */
     public function query(RoleTitle $model): QueryBuilder
     {
-        return $model->newQuery()->latest();
+        $query = $model->newQuery();
+
+        if (datatable_has_no_explicit_order()) {
+            $query->latest();
+        }
+
+        return $query;
     }
 
     /**

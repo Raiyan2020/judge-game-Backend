@@ -33,7 +33,7 @@ class ContactDataTable extends DataTable
                 });
             })
             ->addIndexColumn()
-            ->rawColumns(['action'])
+            ->rawColumns(['action', 'formatted_phone'])
             ->setRowId('id');
     }
 

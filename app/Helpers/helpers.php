@@ -181,6 +181,10 @@ function format_money($value): string
 
 /**
  * Format a phone number with its country code for display.
+ *
+ * Wrapped in a dir="ltr" span: on an RTL (Arabic) page, plain "+20 1444..."
+ * text gets its digit groups reordered by the browser's bidi algorithm
+ * (rendering as "1444... 20+"). Forcing ltr keeps the code before the number.
  */
 function format_phone_with_code(?string $countryCode, ?string $phone): string
 {
@@ -190,10 +194,8 @@ function format_phone_with_code(?string $countryCode, ?string $phone): string
 
     $code = $countryCode !== null ? ltrim($countryCode, '+') : '';
 
-    if ($code === '') {
-        return $phone;
-    }
+    $text = $code === '' ? $phone : '+' . $code . ' ' . $phone;
 
-    return '+' . $code . ' ' . $phone;
+    return '<span dir="ltr">' . e($text) . '</span>';
 }
 

@@ -45,6 +45,12 @@ class NewMessageNotification extends Notification
             // group_id ?? model_id ?? id, so exposing the chat id as model_id
             // (and no group_id) makes the push land on the private chat.
             'model_id' => $this->message->chat_id,
+            // The counterpart's user id (the message SENDER, from the reader's
+            // side). The in-app notifications list routes the private chat by the
+            // peer's user id (`receiver_id` path param) with the chat id as the
+            // `chat_id` query, so a reply from that entry point posts to the right
+            // person. `model_id` (chat id) alone can't identify the receiver.
+            'sender_id' => $this->message->user_id,
         ];
     }
 

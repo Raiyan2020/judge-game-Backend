@@ -37,8 +37,38 @@ class MessageStoreRequest extends FormRequest
             // dangerous: `html`, `htm`, `svg`, `xml` and scripts. Uploads land
             // on the PUBLIC disk with a sniffed extension, so those would be
             // served back as active content from this app's own origin
-            // (stored XSS). `max` caps an otherwise unbounded upload.
-            'attachment' => 'nullable|file|mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf,doc,docx,txt,mp3,m4a,wav,aac,ogg,mp4,mov|max:10240',
+            // (stored XSS). `max` is the PER-TYPE ceiling below — a flat
+            // `max:10240` rejected a chat video the case-evidence path
+            // (`videos.*|max:51200`) accepts.
+            'attachment' => 'nullable|file|mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf,doc,docx,txt,mp3,m4a,wav,aac,ogg,mp4,mov|max:'.$this->attachmentMaxKilobytes(),
         ];
+    }
+
+    /**
+     * Per-type upload ceiling (in kilobytes) for the `attachment` file.
+     *
+     * Mirrors the app's ChatAttachmentPolicy and the case-evidence limits: a
+     * video (mp4/mov) may be 50 MiB (`max:51200`), everything else 15 MiB
+     * (`max:15360`). `public/.user.ini` raises PHP's `upload_max_filesize`/
+     * `post_max_size` to 60M/64M, so a 50 MiB clip survives to validation.
+     *
+     * The kind is read from the uploaded file's sniffed MIME (belt) and its
+     * extension (suspenders) — `$this->file()` is available inside `rules()`.
+     */
+    private function attachmentMaxKilobytes(): int
+    {
+        $file = $this->file('attachment');
+        if ($file === null) {
+            return 15360;
+        }
+
+        $isVideo = str_starts_with((string) $file->getMimeType(), 'video/')
+            || in_array(
+                strtolower((string) $file->getClientOriginalExtension()),
+                ['mp4', 'mov'],
+                true
+            );
+
+        return $isVideo ? 51200 : 15360;
     }
 }

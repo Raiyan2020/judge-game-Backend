@@ -48,6 +48,20 @@ class FcmChannel
             // case or chat. Both keys are sent so either reader works.
             $data['related_data'] = (string) $id;
         }
+        // Forward the model id and the message-sender id as their OWN keys, not
+        // collapsed into `related_data` (which is group_id-first). A case event
+        // carries BOTH a group_id and model_id=case_id, so `related_data` is the
+        // group — the push must also carry the case id to open case details.
+        // A private-message push carries the peer's `sender_id`; `related_data`
+        // is the chat id there, which cannot identify the reply target. Additive:
+        // every existing reader still uses `related_data`. `room_password` is
+        // deliberately NOT forwarded (kept off the lock screen / system logs).
+        if (! empty($payload['model_id'])) {
+            $data['model_id'] = (string) $payload['model_id'];
+        }
+        if (! empty($payload['sender_id'])) {
+            $data['sender_id'] = (string) $payload['sender_id'];
+        }
 
         $this->fcm->sendToToken($token, $title, $body, $data);
     }

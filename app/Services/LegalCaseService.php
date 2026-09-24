@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\CaseRole;
 use App\Enums\GroupRole;
 use App\Enums\LegalCaseStatus;
+use App\Events\LegalCaseUpdated;
 use App\Models\User;
 use App\Notifications\LegalCaseNotification;
 use App\Repositories\GroupRepository;
@@ -27,6 +28,10 @@ class LegalCaseService
         $this->closeExpiredExecutionCasesWithEvents($groupId);
         $this->judgmentService->upholdExpiredFirstInstanceCases($groupId);
         $filters['group_id'] = $groupId;
+        // Pass the caller's id so the repository can scope `pending_lawyer` cases
+        // to the assigned plaintiff lawyer only (they are invisible to everyone
+        // else until officially filed).
+        $filters['current_user_id'] = auth()->id();
         return $this->repo->index($filters);
     }
 
@@ -142,12 +147,23 @@ class LegalCaseService
     }
 
     /**
-     * The presiding judge nudges a case participant (defence lawyer or
-     * consultant) to file their opinion. This sends a notification ONLY — it
-     * changes no case status. The case lifecycle has no intermediate
-     * "in-progress" state and no new→ongoing endpoint (a case only becomes
-     * `ongoing` after a first-instance conviction), so there is nothing to
-     * transition; the judge is simply asking the participant to act.
+     * The presiding judge asks a case participant (defence lawyer or consultant)
+     * to file their opinion, and records the case as awaiting that party's reply
+     * so every further judge action is gated until they answer.
+     *
+     * Concurrency-safe: the mutating portion runs inside a transaction and
+     * re-fetches the case with `findForUpdate` (lockForUpdate) FIRST, so it
+     * serialises on the SAME row lock LegalCaseOpinionServices::createOpinion
+     * holds. This closes the race where the judge reads `alreadyOpined = false`
+     * while the awaited lawyer concurrently commits their opinion — which would
+     * otherwise set an `awaiting_opinion` gate that can never clear (a retry is
+     * 422'd by the one-per-stage rule, so the case wedges permanently).
+     *
+     * Judge-only. Status-gated to `new` / `in_progress` (mirrors
+     * scheduleHearing). Under the lock it re-checks `alreadyOpined`, promotes
+     * `new → in_progress`, and sets the gate atomically; the bell + news fire
+     * AFTER commit so a send failure can neither roll back the gate nor leave the
+     * case promoted-but-ungated.
      *
      * @return string a localized success message
      */
@@ -159,7 +175,8 @@ class LegalCaseService
         // `judge` participant. Unlike closeCase/scheduleHearing this is NOT open
         // to any party — a lawyer must never be able to nudge himself. Cast both
         // sides of every comparison (the older ensureUserIsJudge compares
-        // without casts; the newer methods here cast for a reason).
+        // without casts; the newer methods here cast for a reason). Auth is a
+        // stable ownership read, so it stays outside the transaction.
         $isOwner = $legalCase->group && (int) $legalCase->group->user_id === (int) $userId;
         $isJudgeParticipant = $legalCase->judge && (int) $legalCase->judge->user_id === (int) $userId;
         if (! $isOwner && ! $isJudgeParticipant) {
@@ -173,58 +190,154 @@ class LegalCaseService
             ? CaseRole::CONSULTANT->value
             : CaseRole::DEFENDANT_LAWYER->value;
 
-        $participant = $legalCase->participants()
-            ->where('role', $participantRole)
-            ->first();
-
         $missingMessage = $isConsultant
             ? __('No consultant has been assigned to this case yet.')
             : __('No defense lawyer has been assigned to this case yet.');
 
-        if (! $participant) {
-            throw ValidationException::withMessages([$missingMessage]);
-        }
-
-        $user = User::find($participant->user_id);
-        if (! $user) {
-            throw ValidationException::withMessages([$missingMessage]);
-        }
-
-        $body = $isConsultant
-            ? [
-                'ar' => 'يطلب القاضي تقديم رأيك الاستشاري في القضية رقم ' . $legalCase->id,
-                'en' => 'The judge requests your consultant opinion on case number ' . $legalCase->id,
-            ]
-            : [
-                'ar' => 'يطلب القاضي تقديم مرافعتك في القضية رقم ' . $legalCase->id,
-                'en' => 'The judge requests your defense opinion on case number ' . $legalCase->id,
-            ];
-
-        // Send the nudge. FcmService swallows its own errors (logs and returns),
-        // so the FCM leg never throws; the database notification is the durable
-        // record AND the entire payload of this endpoint, so it is deliberately
-        // NOT wrapped in a try/catch that would report success while sending
-        // nothing.
-        Notification::send($user, new LegalCaseNotification($legalCase, [
-            'model_id' => $legalCase->id,
-            'title' => $isConsultant
-                ? ['ar' => 'طلب رأي استشاري', 'en' => 'Consultant opinion requested']
-                : ['ar' => 'طلب مرافعة الدفاع', 'en' => 'Defense opinion requested'],
-            'body' => $body,
-            'type' => $isConsultant ? 'opinion_requested_consultant' : 'opinion_requested_defense',
-        ]));
-
-        // Also write a group news row (bell above stays targeted at the nudged
-        // party). The body is a complete sentence, so LegalCaseNews::generateContent
-        // renders it via its `default` branch. Fail-soft — a news failure must
-        // never fail the nudge, whose durable payload is the notification above.
         try {
-            $this->repo->createCaseNews($legalCase, 'opinion_requested', $body, $userId, null);
-        } catch (\Throwable $e) {
-            logger()->warning('Opinion-request news failed: ' . $e->getMessage());
-        }
+            DB::beginTransaction();
 
-        return __('The opinion request has been sent');
+            // Lock the case row BEFORE any other read in this transaction, so the
+            // `alreadyOpined` check and the `awaiting_opinion` write commit
+            // atomically against the SAME lock createOpinion holds. Must be the
+            // first SQL here: under REPEATABLE READ the snapshot is pinned at the
+            // first plain SELECT, so taking the locking read first is what lets
+            // the later opinions()->exists() see a concurrently-committed opinion.
+            $legalCase = $this->repo->findForUpdate($legalCase->id);
+            if (! $legalCase) {
+                throw ValidationException::withMessages([
+                    'legal_case_id' => __('Legal case not found'),
+                ]);
+            }
+
+            // Status guard (mirrors scheduleHearing): an opinion may only be
+            // requested while the case is actually being heard (`new` /
+            // `in_progress`). Blocks setting the gate on a not-yet-filed
+            // `pending_lawyer` case — hidden from the group until officially
+            // filed, so the notification + news would LEAK it — and on already-
+            // ruled `ongoing`/`appeal`/`execution`/`closed` cases. Because the
+            // gate can now only be set pre-first-ruling, it is always cleared
+            // before appeal, so the final judgment needs no await gate of its own.
+            // Checked BEFORE the await gate so a wrong-status call returns the
+            // clearer stage message.
+            if (! in_array($legalCase->status, [
+                LegalCaseStatus::NEW->value,
+                LegalCaseStatus::IN_PROGRESS->value,
+            ], true)) {
+                throw ValidationException::withMessages([
+                    __('An opinion can only be requested for a case that is being heard'),
+                ]);
+            }
+
+            // Part 3 gate: while the case is already awaiting a previously-
+            // requested opinion, the judge may take NO further action until that
+            // party responds. Re-read under the lock so it reflects a concurrent
+            // set/clear.
+            self::ensureNotAwaitingOpinion($legalCase);
+
+            $participant = $legalCase->participants()
+                ->where('role', $participantRole)
+                ->first();
+
+            if (! $participant) {
+                throw ValidationException::withMessages([$missingMessage]);
+            }
+
+            $user = User::find($participant->user_id);
+            if (! $user) {
+                throw ValidationException::withMessages([$missingMessage]);
+            }
+
+            // Don't open a gate that can never close: if the requested party has
+            // ALREADY filed their opinion at the current stage, the one-per-stage
+            // rule (LegalCaseOpinionServices::createOpinion) would forbid them
+            // from responding, wedging `awaiting_opinion` forever. Re-checked
+            // UNDER THE LOCK, so a concurrent createOpinion (which also
+            // lockForUpdate's this row) is serialised: either its opinion is
+            // already visible here (reject) or it waits behind this transaction
+            // and then sees our gate. The status guard above guarantees
+            // new/in_progress, so the stage is always `new` (resolveStage
+            // collapses pending/new/in_progress → new).
+            $alreadyOpined = $legalCase->opinions()
+                ->where('user_id', $participant->user_id)
+                ->where('stage', LegalCaseStatus::NEW->value)
+                ->exists();
+
+            if ($alreadyOpined) {
+                throw ValidationException::withMessages([
+                    $isConsultant
+                        ? __('The consultant has already submitted their opinion for this case')
+                        : __('The defense lawyer has already submitted their opinion for this case'),
+                ]);
+            }
+
+            // The judge acting on the case moves it from `new` to `in_progress`
+            // ("being heard, pre-ruling"). Idempotent: a no-op once past `new`,
+            // never touches later stages.
+            $this->promoteToInProgressIfNew($legalCase);
+
+            // Record which party the judge is now awaiting, INSIDE the lock so it
+            // commits atomically with the promotion and the guarded reads. Stores
+            // the PARTICIPANT role value (`defendant_lawyer` | `consultant`);
+            // createOpinion clears it once that party files (and re-notifies the
+            // judge).
+            $legalCase->update(['awaiting_opinion' => $participantRole]);
+
+            $body = $isConsultant
+                ? [
+                    'ar' => 'يطلب القاضي تقديم رأيك الاستشاري في القضية رقم ' . $legalCase->id,
+                    'en' => 'The judge requests your consultant opinion on case number ' . $legalCase->id,
+                ]
+                : [
+                    'ar' => 'يطلب القاضي تقديم مرافعتك في القضية رقم ' . $legalCase->id,
+                    'en' => 'The judge requests your defense opinion on case number ' . $legalCase->id,
+                ];
+
+            // Fire the nudge (bell) and the group news row AFTER COMMIT: the gate
+            // is already durably set, so a push/notification/news failure can
+            // neither roll it back nor leave the case promoted-but-ungated (which
+            // would otherwise let the judge rule while the await rule should still
+            // hold). afterCommit runs inline inside DB::commit() here (no queue
+            // worker), so each leg is wrapped — an uncaught throw would reach the
+            // catch below and rollBack an already-committed transaction. The
+            // database notification is still the durable record; on failure it
+            // logs rather than 500-ing an already-gated request, and the lawyer
+            // can still clear the gate by filing.
+            DB::afterCommit(function () use ($legalCase, $user, $isConsultant, $body, $userId) {
+                try {
+                    Notification::send($user, new LegalCaseNotification($legalCase, [
+                        'model_id' => $legalCase->id,
+                        'title' => $isConsultant
+                            ? ['ar' => 'طلب رأي استشاري', 'en' => 'Consultant opinion requested']
+                            : ['ar' => 'طلب مرافعة الدفاع', 'en' => 'Defense opinion requested'],
+                        'body' => $body,
+                        'type' => $isConsultant ? 'opinion_requested_consultant' : 'opinion_requested_defense',
+                    ]));
+                } catch (\Throwable $e) {
+                    logger()->warning('Opinion-request notification failed: ' . $e->getMessage());
+                }
+
+                // Group news row (bell above stays targeted at the nudged party).
+                // Complete sentence → LegalCaseNews::generateContent `default`.
+                try {
+                    $this->repo->createCaseNews($legalCase, 'opinion_requested', $body, $userId, null);
+                } catch (\Throwable $e) {
+                    logger()->warning('Opinion-request news failed: ' . $e->getMessage());
+                }
+
+                // Realtime nudge: the gate is now SET (and the case may have
+                // promoted new → in_progress), so any open case screen re-fetches
+                // and disables the judge's actions. Fail-soft inside the helper.
+                self::broadcastCaseUpdated($legalCase);
+            });
+
+            DB::commit();
+
+            return __('The opinion request has been sent');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
     }
 
     /**
@@ -242,12 +355,44 @@ class LegalCaseService
             throw ValidationException::withMessages([__('You are not authorized to perform this action')]);
         }
 
+        // A hearing may only be scheduled while the case is actually being heard
+        // (`new` / `in_progress`). This blocks a hearing on a `pending_lawyer`
+        // case — hidden from the group until officially filed, so a hearing +
+        // group-chat post + notifications would LEAK the held case — and on
+        // already-ruled `ongoing`/`appeal`/`execution`/`closed` cases (matching
+        // the app hiding the button post-ruling). Appeal-stage hearings are
+        // intentionally out of scope.
+        if (! in_array($legalCase->status, [
+            LegalCaseStatus::NEW->value,
+            LegalCaseStatus::IN_PROGRESS->value,
+        ], true)) {
+            throw ValidationException::withMessages([
+                __('A hearing can only be scheduled for a case that is being heard'),
+            ]);
+        }
+
+        // Part 3 gate: if the JUDGE has an opinion request outstanding, they may
+        // not schedule a hearing until that party responds. Scoped to the judge
+        // (this endpoint is open to any party) — the awaited lawyer scheduling
+        // their own hearing is not the action being gated.
+        if ($this->isCaseJudge($legalCase, (int) $userId)) {
+            self::ensureNotAwaitingOpinion($legalCase);
+        }
+
         $hearing = $legalCase->hearings()->create([
             'room_id' => $data['room_id'] ?? null,
             'created_by' => $userId,
             'scheduled_at' => $data['scheduled_at'],
             'status' => 'scheduled',
         ]);
+
+        // Hearing creation stays open to any party (above), but the case only
+        // advances `new → in_progress` when the JUDGE schedules it — a lawyer
+        // scheduling a hearing creates the hearing without moving the case.
+        // Idempotent and never touches later stages.
+        if ($this->isCaseJudge($legalCase, (int) $userId)) {
+            $this->promoteToInProgressIfNew($legalCase);
+        }
 
         // No transaction here, so notify inline (try/catch so a failed FCM/DB
         // notification never fails the scheduling itself).
@@ -299,6 +444,170 @@ class LegalCaseService
         ]));
     }
 
+    /**
+     * Is [$userId] the presiding judge of this case — the group owner OR the
+     * attached `judge` participant? Mirrors the check requestOpinion makes
+     * inline; used to gate the judge-only status write in scheduleHearing.
+     */
+    private function isCaseJudge($legalCase, int $userId): bool
+    {
+        $isOwner = $legalCase->group && (int) $legalCase->group->user_id === $userId;
+        $isJudgeParticipant = $legalCase->judge && (int) $legalCase->judge->user_id === $userId;
+
+        return $isOwner || $isJudgeParticipant;
+    }
+
+    /**
+     * Advance a case from `new` to `in_progress` ("being heard, pre-ruling").
+     * Idempotent: only ever acts when the status is literally `new`, so it is a
+     * no-op once the case has moved on and NEVER pulls a later stage
+     * (`ongoing`/`appeal`/`execution`/`closed`) backwards.
+     */
+    private function promoteToInProgressIfNew($legalCase): void
+    {
+        if ($legalCase->status === LegalCaseStatus::NEW->value) {
+            $legalCase->update(['status' => LegalCaseStatus::IN_PROGRESS->value]);
+            $legalCase->refresh();
+        }
+    }
+
+    /**
+     * Part 3 gate — while a case is awaiting a previously-requested opinion
+     * (`awaiting_opinion` = `defendant_lawyer` | `consultant`), the judge may
+     * take no further action until that party responds. Shared by
+     * requestOpinion / scheduleHearing (here) and storeFirstJudgment
+     * (LegalCaseJudgmentService). STATIC so the judgment service can call it
+     * without injecting LegalCaseService — LegalCaseService already depends on
+     * LegalCaseJudgmentService, so the reverse injection would close a DI cycle.
+     */
+    public static function ensureNotAwaitingOpinion($legalCase): void
+    {
+        if (! empty($legalCase->awaiting_opinion)) {
+            throw ValidationException::withMessages([
+                'legal_case_id' => __('Waiting for the requested opinion before taking another action'),
+            ]);
+        }
+    }
+
+    /**
+     * Fire the lightweight `LegalCaseUpdated` realtime signal so an open case
+     * screen re-fetches when the case's gate/status changes. STATIC for the same
+     * reason as ensureNotAwaitingOpinion: the opinion + judgment services fire it
+     * without injecting LegalCaseService (which would close a DI cycle). ALWAYS
+     * call it from `DB::afterCommit` (or outside any transaction) so the model
+     * reflects committed state. Fail-soft — a broadcast failure must never bubble
+     * out and undo the committed mutation it is merely announcing. Mirrors how
+     * MessageService wraps `broadcast(new MessageSent(...))`.
+     */
+    public static function broadcastCaseUpdated($legalCase): void
+    {
+        try {
+            broadcast(new LegalCaseUpdated($legalCase));
+        } catch (\Throwable $e) {
+            logger()->warning('Broadcast LegalCaseUpdated failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * The presiding judge WITHDRAWS an outstanding opinion request, lifting the
+     * `awaiting_opinion` gate so the judge is not blocked forever if the awaited
+     * party never files. Judge-only (mirrors requestOpinion's auth). Same lock
+     * discipline as requestOpinion / createOpinion: the row is re-fetched with
+     * `findForUpdate` FIRST, so the read-and-clear commits atomically against a
+     * concurrent createOpinion (which also locks the row).
+     *
+     * Does NOT revert the status: the case is legitimately being heard
+     * (`in_progress`) — only the await block is withdrawn. No news/chat row (a
+     * withdrawal is not group-worthy). After commit it optionally tells the
+     * ex-awaited party and broadcasts the cleared gate; both fail-soft. Returns
+     * the updated case so the app re-renders with the gate lifted.
+     */
+    public function cancelOpinionRequest($legalCase)
+    {
+        $userId = auth()->id();
+
+        // JUDGE-ONLY (mirror requestOpinion): only the presiding judge who set
+        // the gate may withdraw it. Ownership read stays outside the transaction.
+        $isOwner = $legalCase->group && (int) $legalCase->group->user_id === (int) $userId;
+        $isJudgeParticipant = $legalCase->judge && (int) $legalCase->judge->user_id === (int) $userId;
+        if (! $isOwner && ! $isJudgeParticipant) {
+            throw ValidationException::withMessages([__('You are not authorized to perform this action')]);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            // Lock the row FIRST (same rationale as requestOpinion): the
+            // awaiting_opinion read + clear then commit atomically against a
+            // concurrent createOpinion that is filing the awaited opinion.
+            $legalCase = $this->repo->findForUpdate($legalCase->id);
+            if (! $legalCase) {
+                throw ValidationException::withMessages([
+                    'legal_case_id' => __('Legal case not found'),
+                ]);
+            }
+
+            // Nothing to cancel — no request is outstanding. A clear localized
+            // 422 (not a silent success) so the judge knows the state, e.g. when
+            // the awaited party filed a moment earlier and cleared it themselves.
+            if (empty($legalCase->awaiting_opinion)) {
+                throw ValidationException::withMessages([
+                    'legal_case_id' => __('There is no pending opinion request to cancel'),
+                ]);
+            }
+
+            // Which party was awaited — captured before the clear so the optional
+            // withdrawal notice can target them.
+            $awaitedRole = $legalCase->awaiting_opinion;
+            $awaitedParticipant = $legalCase->participants()
+                ->where('role', $awaitedRole)
+                ->first();
+            $awaitedUser = $awaitedParticipant ? User::find($awaitedParticipant->user_id) : null;
+
+            // Lift the gate. Status is deliberately untouched — the case is still
+            // being heard; only the await block is removed.
+            $legalCase->update(['awaiting_opinion' => null]);
+
+            // After commit: tell the ex-awaited party the request was withdrawn,
+            // and broadcast the cleared gate so an open case screen re-renders.
+            // Both fail-soft — the gate is already durably lifted, so neither may
+            // roll it back. afterCommit runs inline here (no queue worker), so an
+            // uncaught throw would reach the catch below and rollBack an
+            // already-committed transaction — hence the per-leg try/catch.
+            DB::afterCommit(function () use ($legalCase, $awaitedUser) {
+                if ($awaitedUser) {
+                    try {
+                        Notification::send($awaitedUser, new LegalCaseNotification($legalCase, [
+                            'model_id' => $legalCase->id,
+                            'title' => [
+                                'ar' => 'تم سحب طلب الرأي',
+                                'en' => 'Opinion request withdrawn',
+                            ],
+                            'body' => [
+                                'ar' => 'سحب القاضي طلب الرأي في القضية رقم ' . $legalCase->id,
+                                'en' => 'The judge withdrew the opinion request on case number ' . $legalCase->id,
+                            ],
+                            'type' => 'opinion_request_cancelled',
+                        ]));
+                    } catch (\Throwable $e) {
+                        logger()->warning('Opinion-request-cancel notification failed: ' . $e->getMessage());
+                    }
+                }
+
+                self::broadcastCaseUpdated($legalCase);
+            });
+
+            DB::commit();
+
+            $legalCase->refresh();
+
+            return $legalCase;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
+
 
     public function create($request)
     {
@@ -341,6 +650,14 @@ class LegalCaseService
                 }
             }
 
+            // The case is HELD with the plaintiff lawyer until they officially
+            // file it (= write their opinion). Set `pending_lawyer` EXPLICITLY —
+            // the DB default is `new`, which would leak the case straight into
+            // the group before the lawyer files. The transition to `new`, and
+            // the deferred case-filed effects (news + chat + judge/defendant
+            // notifications), happen in LegalCaseOpinionServices::createOpinion.
+            $request['status'] = LegalCaseStatus::PENDING_LAWYER->value;
+
             $legalCase = $this->repo->create($request);
             $attachments = $this->collectAttachments($request);
             $this->uploadAttachments($legalCase, $attachments);
@@ -355,7 +672,6 @@ class LegalCaseService
 
             $legalCase->participants()->createMany($participants);
             $legalCase->groupLaws()->attach($request['group_law_ids']);
-            $this->createCaseNews($legalCase, $userId, $participants);
 
             // Credit the plaintiff for filing — the citizen points the profile
             // shows and the post-filing "reward" popup promises. Idempotent per
@@ -367,17 +683,19 @@ class LegalCaseService
             // runs synchronously (no queue worker here), so any throw would
             // propagate out of create() and 500 an already-committed case. The
             // try/catch keeps a failed notification from doing that.
-            DB::afterCommit(function () use ($legalCase, $group, $participants) {
+            // Only the plaintiff-lawyer assignment fires at creation now (type
+            // `plaintiff_lawyer_assign`, routing them to the intake screen). The
+            // judge/defendant "case filed" notifications, the news entry and the
+            // group-chat post are DEFERRED to official filing — see
+            // fireCaseFiledEffects, called from
+            // LegalCaseOpinionServices::createOpinion once the plaintiff lawyer
+            // files. Until then the case is invisible to everyone but the
+            // plaintiff side.
+            DB::afterCommit(function () use ($legalCase) {
                 try {
                     $this->sendNotificationToPlaintiffLawyer($legalCase);
-                    $this->sendCaseFiledNotifications($legalCase, $group, $participants);
-                    // Mirror into the group chat (bell + news already sent above).
-                    $this->events->postChat(
-                        $group,
-                        'تم رفع قضية جديدة: ' . $legalCase->title,
-                    );
                 } catch (\Throwable $e) {
-                    logger()->warning('Case-filed notification failed: ' . $e->getMessage());
+                    logger()->warning('Plaintiff-lawyer notification failed: ' . $e->getMessage());
                 }
             });
 
@@ -390,20 +708,46 @@ class LegalCaseService
         }
     }
 
-    private function createCaseNews($legalCase, $userId, $participants)
+    /**
+     * The "case officially filed" side effects, DEFERRED out of create() until
+     * the plaintiff lawyer files their opinion (Part 2). Called from
+     * LegalCaseOpinionServices::createOpinion on the `pending_lawyer → new`
+     * transition, inside its DB::afterCommit. Fires the news feed entry, the
+     * judge/defendant "case filed" bell notifications, and the group-chat post.
+     *
+     * Fail-soft (self-contained try/catch): this runs after the opinion has
+     * already committed, so a failed notification must never bubble out and 500
+     * an already-filed case.
+     */
+    public function fireCaseFiledEffects($legalCase): void
     {
-        $defendant = null;
-        foreach ($participants as $participant) {
-            if ($participant['role'] == 'defendant') {
-                $defendant = $participant['user_id'];
-                break;
+        try {
+            $group = $legalCase->group;
+            if (! $group) {
+                return;
             }
-        }
-        if ($defendant) {
-            $this->repo->createCaseNews($legalCase, 'case_created', [
-                'ar' => 'تم إنشاء القضية',
-                'en' => 'Legal case created',
-            ], $userId, $defendant);
+
+            // News feed entry (actor = filer, subject = defendant) — was created
+            // at creation time; the filer is stored on the case as `user_id`.
+            $defendantUserId = $legalCase->defendant?->user_id;
+            if ($defendantUserId) {
+                $this->repo->createCaseNews($legalCase, 'case_created', [
+                    'ar' => 'تم إنشاء القضية',
+                    'en' => 'Legal case created',
+                ], $legalCase->user_id, $defendantUserId);
+            }
+
+            // Bell notifications: defendant (filed against you) + judge (filed in
+            // your group).
+            $this->sendCaseFiledNotifications($legalCase, $group);
+
+            // Group-chat mirror.
+            $this->events->postChat(
+                $group,
+                'تم رفع قضية جديدة: ' . $legalCase->title,
+            );
+        } catch (\Throwable $e) {
+            logger()->warning('Case-filed effects failed: ' . $e->getMessage());
         }
     }
 
@@ -518,13 +862,17 @@ class LegalCaseService
         }
 
         // Assignable while the case is still open at first instance (new /
-        // ongoing) OR under APPEAL — a convicted defendant who had no lawyer must
-        // be able to appoint one to defend the appeal (C1). Only execution /
-        // closed are too late.
+        // in_progress / ongoing) OR under APPEAL — a convicted defendant who had
+        // no lawyer must be able to appoint one to defend the appeal (C1).
+        // `in_progress` is first-instance too (a hearing was scheduled), so the
+        // defendant can still appoint counsel there. Only execution / closed are
+        // too late. (`pending_lawyer` never reaches here: the defendant cannot
+        // yet see a case that has not been officially filed.)
         if (! in_array(
             $case->status,
             [
                 LegalCaseStatus::NEW->value,
+                LegalCaseStatus::IN_PROGRESS->value,
                 LegalCaseStatus::ONGOING->value,
                 LegalCaseStatus::APPEAL->value,
             ],
@@ -617,35 +965,29 @@ class LegalCaseService
      * Notify the two parties a filing must reach but previously did not: the
      * DEFENDANT (a case was filed against them) and the group's JUDGE (a case
      * was filed in their court). Only the plaintiff lawyer was ever notified.
-     * The defendant id is read from the participants array; the judge is the
-     * group owner (attached as the `judge` participant via `$group->user_id`).
+     * The defendant is read from the case's `defendant` party relation; the
+     * judge is the group owner (attached as the `judge` participant via
+     * `$group->user_id`).
      */
-    private function sendCaseFiledNotifications($legalCase, $group, array $participants): void
+    private function sendCaseFiledNotifications($legalCase, $group): void
     {
-        $defendantId = null;
-        foreach ($participants as $participant) {
-            if (($participant['role'] ?? null) === 'defendant') {
-                $defendantId = $participant['user_id'];
-                break;
-            }
-        }
-
-        if ($defendantId) {
-            $defendant = User::find($defendantId);
-            if ($defendant) {
-                Notification::send($defendant, new LegalCaseNotification($legalCase, [
-                    'model_id' => $legalCase->id,
-                    'title' => [
-                        'ar' => 'قضية جديدة مرفوعة ضدك',
-                        'en' => 'A new case filed against you',
-                    ],
-                    'body' => [
-                        'ar' => 'تم رفع قضية جديدة ضدك برقم ' . $legalCase->id,
-                        'en' => 'A new case (#' . $legalCase->id . ') has been filed against you',
-                    ],
-                    'type' => 'case_filed_against_you',
-                ]));
-            }
+        // Read the defendant from the case's `defendant` party relation (this
+        // now runs at official-filing time, not creation, so there is no
+        // in-memory participants array to walk).
+        $defendant = $legalCase->defendant?->user;
+        if ($defendant) {
+            Notification::send($defendant, new LegalCaseNotification($legalCase, [
+                'model_id' => $legalCase->id,
+                'title' => [
+                    'ar' => 'قضية جديدة مرفوعة ضدك',
+                    'en' => 'A new case filed against you',
+                ],
+                'body' => [
+                    'ar' => 'تم رفع قضية جديدة ضدك برقم ' . $legalCase->id,
+                    'en' => 'A new case (#' . $legalCase->id . ') has been filed against you',
+                ],
+                'type' => 'case_filed_against_you',
+            ]));
         }
 
         $judge = User::find($group->user_id);
@@ -663,12 +1005,38 @@ class LegalCaseService
                 'type' => 'case_filed_in_group',
             ]));
         }
+
+        // The PLAINTIFF filer (`legal_cases.user_id`) — until now the only party
+        // never told when their case actually reaches the judge. Official filing
+        // is the plaintiff lawyer's act, not the citizen's, so the filer has no
+        // way to know their case moved from "held with my lawyer" to "before the
+        // judge" without this. New type `case_officially_filed` routes them to
+        // the live case (distinct from `plaintiff_lawyer_assign`, which routes
+        // the lawyer to intake at creation time).
+        $plaintiff = User::find($legalCase->user_id);
+        if ($plaintiff) {
+            Notification::send($plaintiff, new LegalCaseNotification($legalCase, [
+                'model_id' => $legalCase->id,
+                'title' => [
+                    'ar' => 'تم رفع قضيتك رسميًا',
+                    'en' => 'Your case is now before the judge',
+                ],
+                'body' => [
+                    'ar' => 'راجع محاميك قضيتك رقم ' . $legalCase->id . ' وأصبحت الآن أمام القاضي',
+                    'en' => 'Your lawyer reviewed your case #' . $legalCase->id . ' and it is now before the judge',
+                ],
+                'type' => 'case_officially_filed',
+            ]));
+        }
     }
 
     public function getCasesStatus($groupId = null)
     {
         // Settle finished execution cases first so the counters are honest.
         $this->repo->closeExpiredExecutionCases($groupId);
-        return $this->repo->getCasesStatus($groupId);
+        // Pass the caller's id through: the `pending_lawyer` counter is
+        // user-scoped (only the assigned plaintiff lawyer's «بانتظار رفعي»
+        // cases), unlike the group-wide status tallies.
+        return $this->repo->getCasesStatus($groupId, auth()->id());
     }
 }

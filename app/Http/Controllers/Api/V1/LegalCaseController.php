@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\CaseRole;
+use App\Enums\LegalCaseStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\AssignDefendantLawyerRequest;
 use App\Http\Requests\Api\V1\LegalCaseRequest;
@@ -82,6 +84,29 @@ class LegalCaseController extends Controller
         // the case's own group is the minimum bar.
         $this->ensureGroupMember((int) $legalCase->group_id);
 
+        // A `pending_lawyer` case is HELD with the plaintiff lawyer and is not
+        // yet officially filed — it must be readable ONLY by the plaintiff SIDE
+        // (the plaintiff/filer + the assigned plaintiff lawyer). Everyone else,
+        // the judge included, is forbidden until the lawyer files. Use the
+        // sanctum guard to match ensureGroupMember (the default guard can resolve
+        // null here and lock out the plaintiff on their own case). Other statuses
+        // keep the membership-only rule above.
+        if ($legalCase->status === LegalCaseStatus::PENDING_LAWYER->value) {
+            $userId = (int) auth('sanctum')->id();
+            $isPlaintiffSide = (int) $legalCase->user_id === $userId
+                || $legalCase->participants()
+                    ->where('user_id', $userId)
+                    ->whereIn('role', [
+                        CaseRole::PLAINTIFF->value,
+                        CaseRole::PLAINTIFF_LAWYER->value,
+                    ])
+                    ->exists();
+
+            if (! $isPlaintiffSide) {
+                abort(403, __('This case has not been officially filed yet'));
+            }
+        }
+
         // A case that finished its enforcement window should read as `closed`.
         $this->legalCaseService->settleIfExecutionExpired($legalCase);
         $legalCase->load($this->relations());
@@ -111,6 +136,19 @@ class LegalCaseController extends Controller
     {
         $message = $this->legalCaseService->requestOpinion($legalCase, $request->validated());
         return \responder::success($message);
+    }
+
+    /**
+     * The presiding judge withdraws an outstanding opinion request, clearing the
+     * `awaiting_opinion` gate. Unlike `requestOpinion` (a bare message), this
+     * returns the full case so the app re-renders with the judge's actions
+     * unblocked. Takes no body — the case id in the path is enough.
+     */
+    public function cancelOpinionRequest(LegalCase $legalCase)
+    {
+        $legalCase = $this->legalCaseService->cancelOpinionRequest($legalCase);
+        $legalCase->load($this->relations());
+        return \responder::success(new LegalCaseResource($legalCase));
     }
 
 

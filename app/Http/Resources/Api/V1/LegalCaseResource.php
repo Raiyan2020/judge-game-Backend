@@ -23,6 +23,11 @@ class LegalCaseResource extends JsonResource
             'can_consult' => $this->canConsult(),
             'status' => $this->status,
             'status_text' => __($this->status),
+            // Part 3: the participant role the judge is awaiting an opinion from
+            // (`defendant_lawyer` | `consultant`), or null when free to act. The
+            // app disables the judge's action buttons and shows a waiting notice
+            // while this is non-null.
+            'awaiting_opinion' => $this->awaiting_opinion,
             'damages' => $this->damages,
             'final_judgment' => $this->relationLoaded('finalJudgment') && $this->finalJudgment ? $this->finalJudgment?->judgment_type : null,
 

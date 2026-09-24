@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
-#[Fillable(['title', 'group_id', 'description', 'user_id', 'status', 'damages','winner_id'])]
+#[Fillable(['title', 'group_id', 'description', 'user_id', 'status', 'damages','winner_id', 'awaiting_opinion'])]
 class LegalCase extends Model implements HasMedia
 {
     use InteractsWithMedia;
@@ -137,6 +137,10 @@ class LegalCase extends Model implements HasMedia
         if (in_array($this->status, [
             LegalCaseStatus::CLOSED->value,
             LegalCaseStatus::EXECUTION->value,
+            // Not yet officially filed — held with the plaintiff lawyer. No
+            // consultant may self-initiate on it (defence-in-depth beside the
+            // createOpinion pending-case guard and the `show` 403).
+            LegalCaseStatus::PENDING_LAWYER->value,
         ], true)) {
             return false;
         }

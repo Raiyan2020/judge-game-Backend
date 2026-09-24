@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\CaseRole;
+use App\Enums\LegalCaseStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\StoreLegalCaseAppealRequest;
 use App\Http\Requests\Api\V1\StoreLegalCaseOpinionRequest;
 use App\Http\Resources\Api\V1\LegalCaseResource;
+use App\Models\LegalCase;
 use App\Models\LegalCaseOpinion;
 use App\Services\LegalCaseOpinionServices;
 use Illuminate\Http\Request;
@@ -17,9 +20,57 @@ class LegalCaseOpinionController extends Controller
 
     public function addOpinion(StoreLegalCaseOpinionRequest $request)
     {
+        // `add-opinion` is deliberately NOT in the `checkActiveSubscription`
+        // route group, because the plaintiff lawyer's OFFICIATING opinion (the
+        // only act that files a `pending_lawyer` case) must go through even for a
+        // lapsed lawyer. Every OTHER opinion stays subscription-gated here, with
+        // the same 402 shape the middleware returns.
+        if ($subscriptionError = $this->subscriptionGate($request->validated())) {
+            return $subscriptionError;
+        }
+
         $legalCase = $this->legalCaseOpinionService->createOpinion($request->validated());
         $legalCase->load($this->relations());
         return \responder::success(new LegalCaseResource($legalCase));
+    }
+
+    /**
+     * Enforce the active-subscription requirement for every add-opinion EXCEPT
+     * the official filing (case is `pending_lawyer` AND the author is its
+     * assigned plaintiff lawyer). Returns the 402 response to short-circuit with,
+     * or null when the request may proceed. Mirrors `CheckActiveSubscription`.
+     */
+    private function subscriptionGate(array $data)
+    {
+        $user = auth()->user();
+        if (! $user) {
+            return null;
+        }
+
+        $legalCase = LegalCase::find($data['legal_case_id'] ?? null);
+
+        // A null / non-pending case is not an official filing, so the gate
+        // applies. (A subscribed user then falls through to the service's
+        // localized "Legal case not found"; a lapsed one gets 402 first.)
+        $isOfficialFiling = $legalCase
+            && $legalCase->status === LegalCaseStatus::PENDING_LAWYER->value
+            && $legalCase->participantRoleFor((int) $user->id) === CaseRole::PLAINTIFF_LAWYER->value;
+
+        if ($isOfficialFiling) {
+            return null;
+        }
+
+        // Same aggregate-subquery relation the middleware uses — check via
+        // `first()`, never `exists()`.
+        if ($user->activeSubscription()->with('package')->first()) {
+            return null;
+        }
+
+        return response()->json([
+            'status' => false,
+            'msg' => __('You do not have an active subscription. Please subscribe to a package first'),
+            'error_code' => 'no_active_subscription',
+        ], 402);
     }
 
     public function requestAppeal(StoreLegalCaseAppealRequest $request)

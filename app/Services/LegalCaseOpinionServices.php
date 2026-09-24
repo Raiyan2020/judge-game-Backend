@@ -18,6 +18,11 @@ class LegalCaseOpinionServices
         protected LegalCaseRepository $repo,
         protected PointsService $points,
         protected GroupEventService $events,
+        // Injected to fire the DEFERRED "case officially filed" effects (news +
+        // judge/defendant notifications + chat) at the pending_lawyer → new
+        // transition. No DI cycle: LegalCaseService does not depend on this
+        // service.
+        protected LegalCaseService $legalCaseService,
     ) {}
 
 
@@ -25,7 +30,10 @@ class LegalCaseOpinionServices
     {
         try {
             DB::beginTransaction();
-            $legalCase = $this->repo->find($request['legal_case_id']);
+            // Lock the case row before the pending-status read so two concurrent
+            // plaintiff-lawyer submissions can't both compute isOfficialFiling
+            // and double-fire the case-filed effects (no unique constraint).
+            $legalCase = $this->repo->findForUpdate($request['legal_case_id']);
 
             if (!$legalCase) {
                 throw ValidationException::withMessages([
@@ -33,9 +41,38 @@ class LegalCaseOpinionServices
                 ]);
             }
 
+            // Part 2 gate: a `pending_lawyer` case is held with the plaintiff
+            // lawyer until they officially file it. ONLY the plaintiff lawyer may
+            // write an opinion on it — reject everyone else BEFORE resolveRole()
+            // runs, since resolveRole() would otherwise self-assign a group
+            // consultant as a party (and award points) on a case that is not yet
+            // officially filed. `add-opinion` validates only `exists`, so this is
+            // the enforcing gate mirroring the `show` 403.
+            if ($legalCase->status === LegalCaseStatus::PENDING_LAWYER->value
+                && $legalCase->participantRoleFor(auth()->id()) !== CaseRole::PLAINTIFF_LAWYER->value) {
+                throw ValidationException::withMessages([
+                    __('This case has not been officially filed yet'),
+                ]);
+            }
+
             $stage = $this->resolveStage($legalCase);
 
             $role = $this->resolveRole($legalCase);
+
+            // OFFICIAL FILING: the plaintiff lawyer writing their opinion on a
+            // `pending_lawyer` case IS the act that officially files it. Captured
+            // BEFORE the status flip below so the afterCommit branch is decided
+            // on the pre-transition status.
+            $isOfficialFiling = $legalCase->status === LegalCaseStatus::PENDING_LAWYER->value
+                && $role === CaseRole::PLAINTIFF_LAWYER->value;
+
+            // Part 3: if the judge was AWAITING this exact role's opinion
+            // (`awaiting_opinion` = `defendant_lawyer` | `consultant`), this
+            // submission answers it — clear the gate so the judge can act again.
+            // The `case_opinion` judge notification below still fires. Captured
+            // before the clear so the flag reflects the pre-submission state.
+            $clearsAwaiting = ! empty($legalCase->awaiting_opinion)
+                && $role === $legalCase->awaiting_opinion;
 
             // One opinion per user per stage — a lawyer / consultant cannot file
             // twice for the same case at the same stage. There was no guard, so
@@ -66,11 +103,48 @@ class LegalCaseOpinionServices
             $attachments = $this->collectAttachments($request);
             $this->uploadAttachments($legalCaseOpinion, $attachments);
 
+            // Official filing flips the case `pending_lawyer → new`, inside the
+            // transaction so it commits atomically with the opinion. The opinion
+            // was already stored at stage `new` (resolveStage maps
+            // pending_lawyer → 'new'), so it lands correctly first-instance.
+            if ($isOfficialFiling) {
+                $legalCase->update(['status' => LegalCaseStatus::NEW->value]);
+            }
+
+            // Part 3: the awaited party has now responded — clear the gate inside
+            // the transaction so it commits atomically with their opinion, freeing
+            // the judge to take the next action.
+            if ($clearsAwaiting) {
+                $legalCase->update(['awaiting_opinion' => null]);
+            }
+
             // Register BEFORE committing so the notification fires after the
             // real commit (matching requestAppeal, which already orders it
             // correctly) — otherwise it runs synchronously and a throw rolls
             // back an already-committed opinion.
-            DB::afterCommit(function () use ($legalCase, $legalCaseOpinion) {
+            DB::afterCommit(function () use ($legalCase, $legalCaseOpinion, $isOfficialFiling, $clearsAwaiting) {
+                // On the pending_lawyer → new transition, fire the DEFERRED
+                // case-filed set (news + judge/defendant "case filed" bells +
+                // group chat) and SUPPRESS the two opinion notifications below —
+                // they would duplicate the case-filed notice to the same people.
+                if ($isOfficialFiling) {
+                    $this->legalCaseService->fireCaseFiledEffects($legalCase);
+                    // The status flipped pending_lawyer → new — push the committed
+                    // state so an open screen re-renders. Fail-soft in the helper.
+                    LegalCaseService::broadcastCaseUpdated($legalCase);
+                    return;
+                }
+
+                // Part 3: the awaited party just answered and the `awaiting_opinion`
+                // gate cleared — push the committed state so the judge's open case
+                // screen re-renders with their actions unblocked, live. Fired FIRST,
+                // before the notification sends below: those are not try/catch'd, so
+                // a throwing FCM send must not swallow this gate-clear nudge (the
+                // primary realtime deliverable). Fail-soft in the helper.
+                if ($clearsAwaiting) {
+                    LegalCaseService::broadcastCaseUpdated($legalCase);
+                }
+
                 $this->notifyDefendantOnNewOpinion($legalCase, $legalCaseOpinion);
 
                 // N4 — an opinion filed while the case is under APPEAL is an
@@ -84,9 +158,9 @@ class LegalCaseOpinionServices
                 }
 
                 // The judge must also hear about every FIRST-INSTANCE opinion
-                // (new/ongoing) — from any giver — not only the appeal-stage one
-                // above. Gate on the case STATUS, not resolveStage() (which
-                // collapses ongoing→appeal).
+                // (new/in_progress/ongoing) — from any giver — not only the
+                // appeal-stage one above. Gate on the case STATUS, not
+                // resolveStage() (which collapses ongoing→appeal).
                 $this->notifyJudgeOnFirstInstanceOpinion($legalCase, $legalCaseOpinion);
             });
 
@@ -103,7 +177,15 @@ class LegalCaseOpinionServices
 
     private function notifyDefendantOnNewOpinion($legalCase, $legalCaseOpinion)
     {
-        if ($legalCase->status !== LegalCaseStatus::NEW->value) {
+        // First-instance, pre-ruling: `new` OR `in_progress` (a hearing was
+        // scheduled but no ruling yet). The `pending_lawyer → new` official
+        // filing suppresses this call entirely (it fires the case-filed set
+        // instead), so this path serves legacy cases already at `new`.
+        if (! in_array(
+            $legalCase->status,
+            [LegalCaseStatus::NEW->value, LegalCaseStatus::IN_PROGRESS->value],
+            true
+        )) {
             return;
         }
 
@@ -157,12 +239,18 @@ class LegalCaseOpinionServices
 
     private function notifyJudgeOnFirstInstanceOpinion($legalCase, $legalCaseOpinion): void
     {
-        // First-instance only (new/ongoing). Use the raw status, NOT
+        // First-instance only (new/in_progress/ongoing). Use the raw status, NOT
         // resolveStage() (which maps every non-NEW status to APPEAL and would
-        // misfire on an appeal-stage opinion already handled above).
+        // misfire on an appeal-stage opinion already handled above). `in_progress`
+        // is first-instance too — the judge must still hear about opinions filed
+        // after a hearing is scheduled.
         if (! in_array(
             $legalCase->status,
-            [LegalCaseStatus::NEW->value, LegalCaseStatus::ONGOING->value],
+            [
+                LegalCaseStatus::NEW->value,
+                LegalCaseStatus::IN_PROGRESS->value,
+                LegalCaseStatus::ONGOING->value,
+            ],
             true
         )) {
             return;
@@ -235,7 +323,17 @@ class LegalCaseOpinionServices
 
     private function resolveStage($legalCase): string
     {
-        return $legalCase->status === LegalCaseStatus::NEW->value
+        // First-instance covers the whole pre-ruling arc: `pending_lawyer` (held
+        // with the plaintiff lawyer), `new`, and `in_progress` (being heard). All
+        // three map to the `new` stage so a first-instance opinion — the
+        // plaintiff lawyer's official filing included — lands in the `new` bucket
+        // and the judge's ruling button lights. Everything from `ongoing` onward
+        // is appeal-stage.
+        return in_array($legalCase->status, [
+            LegalCaseStatus::PENDING_LAWYER->value,
+            LegalCaseStatus::NEW->value,
+            LegalCaseStatus::IN_PROGRESS->value,
+        ], true)
             ? LegalCaseStatus::NEW->value
             : LegalCaseStatus::APPEAL->value;
     }
@@ -259,15 +357,18 @@ class LegalCaseOpinionServices
                 ]);
             }
 
-            if ($legalCase->status !== LegalCaseStatus::ONGOING->value) {
-                throw ValidationException::withMessages([
-                    'legal_case_id' => __('Appeal can only be requested for ongoing cases'),
-                ]);
-            }
-
+            // The appeal-specific message must be reachable: it has to run BEFORE
+            // the generic `!== ONGOING` guard, otherwise an already-`appeal` case
+            // trips the generic branch and this clearer message is dead code.
             if ($legalCase->status === LegalCaseStatus::APPEAL->value) {
                 throw ValidationException::withMessages([
                     'legal_case_id' => __('This case is already under appeal'),
+                ]);
+            }
+
+            if ($legalCase->status !== LegalCaseStatus::ONGOING->value) {
+                throw ValidationException::withMessages([
+                    'legal_case_id' => __('Appeal can only be requested for ongoing cases'),
                 ]);
             }
 

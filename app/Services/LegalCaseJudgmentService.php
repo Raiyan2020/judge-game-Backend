@@ -49,6 +49,28 @@ class LegalCaseJudgmentService
 
             $this->ensureUserIsJudge($legalCase);
             $this->ensureCaseIsNotClosed($legalCase);
+
+            // A `pending_lawyer` case is not yet officially filed — the plaintiff
+            // lawyer has not filed their opinion, so there is nothing to rule on.
+            // Ruling here would jump the case to `ongoing` and permanently strip
+            // its official-filing transition (the deferred news/chat/case-filed
+            // notifications would never fire and a later plaintiff-lawyer opinion
+            // would resolve to the appeal stage). Unreachable through the app
+            // (the judge cannot see or list a pending case), but guarded here as
+            // the only lifecycle mutator without a status gate.
+            if ($legalCase->status === LegalCaseStatus::PENDING_LAWYER->value) {
+                throw ValidationException::withMessages([
+                    'legal_case_id' => __('This case has not been officially filed yet'),
+                ]);
+            }
+
+            // Part 3 gate: while the judge is awaiting a requested opinion
+            // (defence lawyer / consultant), the first-instance ruling is blocked
+            // until that party responds. Shared static guard (same App\Services
+            // namespace) — a direct LegalCaseService injection would close a DI
+            // cycle (LegalCaseService already depends on this service).
+            LegalCaseService::ensureNotAwaitingOpinion($legalCase);
+
             $isFinal = in_array($data['judgment_type'], [LegalCaseJudgmentType::DISMISSED->value, LegalCaseJudgmentType::ACQUITTAL->value]);
 
             if ($this->judgmentRepo->hasStageForCase($legalCase->id, LegalCaseJudgmentStage::FIRST_INSTANCE->value)) {
@@ -84,6 +106,12 @@ class LegalCaseJudgmentService
             // Award role points for the first-instance ruling (judge; acquittal
             // also pays the winning defendant side).
             $this->points->onFirstJudgment($legalCase, $data['judgment_type']);
+
+            // Realtime: the case status changed (ongoing / closed) — nudge an
+            // open case screen to re-fetch. afterCommit so it reflects the
+            // committed status; fail-soft in the helper. Same-namespace static
+            // call (no LegalCaseService injection → no DI cycle).
+            DB::afterCommit(fn () => LegalCaseService::broadcastCaseUpdated($legalCase));
 
             DB::commit();
 
@@ -164,6 +192,11 @@ class LegalCaseJudgmentService
 
             // Award role points for the appeal (final) ruling.
             $this->points->onFinalJudgment($legalCase, $data['judgment_type']);
+
+            // Realtime: the case entered execution — nudge an open case screen to
+            // re-fetch. afterCommit so it reflects the committed status; fail-soft
+            // in the helper.
+            DB::afterCommit(fn () => LegalCaseService::broadcastCaseUpdated($legalCase));
 
             DB::commit();
 

@@ -11,6 +11,10 @@ class LegalCaseListResource extends JsonResource
         return [
             'id' => $this->id,
             'title' => $this->title,
+            // The real status string (pending_lawyer / new / in_progress / … ),
+            // so an unfiltered list can distinguish items instead of assuming
+            // the filtered status. Matches LegalCaseResource's `status`.
+            'status' => $this->status,
             // The cover is deliberately NOT an evidence image (JG-038): evidence
             // is filing-time attachments, not a case photo, so using it as the
             // cover was wrong. The card falls back to its default artwork; the
